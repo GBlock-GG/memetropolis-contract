@@ -65,7 +65,6 @@ contract IDOLaunchpadTest is Test {
         
         vm.startPrank(user); // Set user as msg.sender
         uint256 amountToBuy = 1;
-        uint256 cost = amountToBuy * tokenPrice; //1 ETH
         launchpadETH.buyTokens{value: 1 ether}(amountToBuy);        
         vm.stopPrank();
     }
@@ -76,7 +75,6 @@ contract IDOLaunchpadTest is Test {
         vm.startPrank(user); 
         vm.warp(endTime + 1);
         uint256 amountToBuy = 1;
-        uint256 cost = amountToBuy * tokenPrice;
         launchpadETH.buyTokens{value: 1 ether}(amountToBuy);        
         vm.stopPrank();
     }
@@ -87,7 +85,6 @@ contract IDOLaunchpadTest is Test {
         vm.startPrank(user);
         vm.warp(startTime + 1);
         uint256 amountToBuy = 1;
-        uint256 cost = amountToBuy * tokenPrice;
         launchpadETH.buyTokens{value: 0.1 ether}(amountToBuy);
         vm.stopPrank();
     }
