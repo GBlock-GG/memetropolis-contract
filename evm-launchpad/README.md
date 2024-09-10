@@ -45,10 +45,11 @@ $ forge snapshot
 $ anvil
 ```
 
-### Deploy
-
+### Deploy & Verify contract in Sepolia
+Set Private key in .env
 ```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
+source .env
+forge script --chain sepolia script/IDOLaunchpad.s.sol:IDOLaunchpadScript --rpc-url $SEPOLIA_RPC_URL --broadcast --verify
 ```
 
 ### Cast
