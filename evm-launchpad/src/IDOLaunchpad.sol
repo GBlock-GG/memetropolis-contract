@@ -14,6 +14,7 @@ contract IDOLaunchpad {
     uint256 public minInvestment;
     uint256 public maxInvestment;
     uint256 public totalTokensSold;
+    uint256 public claimedAmount;
     uint256 public startTime;
     uint256 public endTime;
 
@@ -99,6 +100,7 @@ contract IDOLaunchpad {
 
         hasClaimedTokens[msg.sender] = true;
         memeCoinToken.safeTransfer(msg.sender, amount);
+        claimedAmount = claimedAmount.add(amount);
 
         emit TokensClaimed(msg.sender, amount);
     }
@@ -125,7 +127,7 @@ contract IDOLaunchpad {
     }
 
     function withdrawUnsoldTokens() external onlyOwner saleHasEnded {
-        uint256 unsoldTokens = memeCoinToken.balanceOf(address(this)).sub(totalTokensSold);
+        uint256 unsoldTokens = memeCoinToken.balanceOf(address(this)).sub(totalTokensSold.sub(claimedAmount));
         memeCoinToken.safeTransfer(owner, unsoldTokens);
     }
 }
