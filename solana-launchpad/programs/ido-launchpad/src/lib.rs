@@ -79,6 +79,12 @@ mod ido_launchpad {
     }
     //transfer user's token_account to launchpad token account
     pub fn buy_tokens(ctx: Context<BuyTokens>, amount: u64) -> Result<()> {
+        let launchpad_state = &ctx.accounts.launchpad_state;
+        let block_timestamp = clock::Clock::get()?.unix_timestamp as u64;
+        if launchpad_state.start_time > block_timestamp || launchpad_state.end_time < block_timestamp {
+            return err!(ErrorCode::InvalidSaleActive);
+        }
+
         if !ctx.accounts.user_stake.is_initialized {
             ctx.accounts.user_stake.is_initialized = true;
             ctx.accounts.user_stake.bump = ctx.bumps.user_stake;
@@ -86,7 +92,6 @@ mod ido_launchpad {
         if amount == 0 {
             return err!(ErrorCode::InvalidAmount);
         }
-        let launchpad_state = &ctx.accounts.launchpad_state;
         let cost = (amount as u128) * launchpad_state.token_price;
         if cost < launchpad_state.min_invest || cost > launchpad_state.max_invest {
             return err!(ErrorCode::InvalidAmount);
@@ -105,6 +110,8 @@ mod ido_launchpad {
         )?;
         ctx.accounts.user_stake.invests = ctx.accounts.user_stake.invests + cost;
         ctx.accounts.user_stake.purchased = ctx.accounts.user_stake.purchased + amount;
+        ctx.accounts.launchpad_state.total_sold =
+            ctx.accounts.launchpad_state.total_sold + (amount as u128);
 
         Ok(())
     }
@@ -113,7 +120,7 @@ mod ido_launchpad {
     pub fn claim_tokens(ctx: Context<ClaimTokens>) -> Result<()> {
         let block_timestamp = clock::Clock::get()?.unix_timestamp as u64;
         if block_timestamp <= ctx.accounts.launchpad_state.end_time {
-            return err!(ErrorCode::InvalidSailEnd);
+            return err!(ErrorCode::InvalidSaleEnd);
         }
         if ctx.accounts.user_stake.has_claimed_tokens {
             return err!(ErrorCode::InvalidClaim);
@@ -161,7 +168,7 @@ mod ido_launchpad {
         //check sale has ended
         let block_timestamp = clock::Clock::get()?.unix_timestamp as u64;
         if block_timestamp <= ctx.accounts.launchpad_state.end_time {
-            return err!(ErrorCode::InvalidSailEnd);
+            return err!(ErrorCode::InvalidSaleEnd);
         }
 
         let withdraw_amount: u64 = ctx.accounts.launchpad_payment_token_account.amount;
@@ -190,7 +197,7 @@ mod ido_launchpad {
     pub fn withdraw_meme(ctx: Context<WithdrawMeme>) -> Result<()> {
         let block_timestamp = clock::Clock::get()?.unix_timestamp as u64;
         if block_timestamp <= ctx.accounts.launchpad_state.end_time {
-            return err!(ErrorCode::InvalidSailEnd);
+            return err!(ErrorCode::InvalidSaleEnd);
         }
         let withdraw_amount = ctx.accounts.launchpad_meme_token_account.amount
             - ((ctx.accounts.launchpad_state.total_sold
@@ -586,8 +593,10 @@ pub enum ErrorCode {
     InvalidPrice,
     #[msg("Invalid amount")]
     InvalidAmount,
+    #[msg("Sale is not active")]
+    InvalidSaleActive,
     #[msg("Sale has ended yet")]
-    InvalidSailEnd,
+    InvalidSaleEnd,
     #[msg("Tokens already claimed")]
     InvalidClaim,
 }
