@@ -19,8 +19,8 @@ describe("buy test", async () => {
   
       const currentBlockTime = await getBlockTimestamp(connection);
   
-      const startTime = currentBlockTime + 10;
-      const endTime = currentBlockTime + 25;
+      const startTime = currentBlockTime + 5;
+      const endTime = startTime + 5;
   
       //create meme Token Mint
       const memeMintKp = new web3.Keypair();
@@ -147,14 +147,16 @@ describe("buy test", async () => {
         connection,
         paymentTokenAccountPda
       );
-      assert(paymentTokenAccount.amount == BigInt(buyTokenAmount));
+      //launchpad's payment token increased buyTokenAmount * price
+      assert(paymentTokenAccount.amount == BigInt(buyTokenAmount * tokenPrice));
   
       const userPaymentTokenAccountInfo = await getAccount(
         connection,
         userPaymentTokenAccount
       );
+      //user's payment token reduced buyTokenAmount * price
       assert(
-        userPaymentTokenAccountInfo.amount == BigInt(100_000 - buyTokenAmount)
+        userPaymentTokenAccountInfo.amount == BigInt(100_000 - buyTokenAmount * tokenPrice)
       );
     });
   });

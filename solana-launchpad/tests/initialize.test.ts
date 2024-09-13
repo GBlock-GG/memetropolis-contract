@@ -19,8 +19,8 @@ describe("initialize test", () => {
 
     const currentBlockTime = await getBlockTimestamp(connection);
 
-    const startTime = currentBlockTime + 20;
-    const endTime = currentBlockTime + 1000;
+    const startTime = currentBlockTime + 5;
+    const endTime = startTime + 5;
 
     console.log("CurrentBlockTime:", currentBlockTime);
 

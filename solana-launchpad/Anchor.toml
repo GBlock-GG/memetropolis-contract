@@ -1,21 +1,18 @@
 [toolchain]
 
 [features]
-resolution = true
+seeds = false
 skip-lint = false
 
 [programs.localnet]
-ido_launchpad = "9YVt3EMoYw87iEi3CDR8eDxEaiMPW2MDtkVJK3DS5GB5"
+ido_launchpad = "GghUhzqc1sYRKC13vfDzTq5XazGveP4GqxTG52U12qLZ"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
 cluster = "Localnet"
-wallet = "~/.config/solana/id.json"
-
-[workspace]
-members = ["programs/ido-launchpad"]
+wallet = "/home/ubuntu/.config/solana/id.json"
 
 [scripts]
-test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.test.ts"

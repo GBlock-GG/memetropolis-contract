@@ -11,13 +11,13 @@ import {
 } from "@solana/spl-token";
 import { sleep, getBlockTimestamp, createTokenMint } from "./utils";
 
-describe("withdraw payment test", async () => {
+describe("test withdraw payment & meme by admin", async () => {
     // Configure the client to use the local cluster.
   anchor.setProvider(anchor.AnchorProvider.env());
   const owner = anchor.Wallet.local().payer;
   const program = anchor.workspace.IdoLaunchpad as Program<IdoLaunchpad>;
   const connection = anchor.getProvider().connection;
-  it("withdraw_payment", async () => {
+  it("test withdraw", async () => {
     const minInvest = 10;
     const maxInvest = 1000000;
     const tokenPrice = 10;
@@ -25,7 +25,7 @@ describe("withdraw payment test", async () => {
     const currentBlockTime = await getBlockTimestamp(connection);
 
     const startTime = currentBlockTime + 5;
-    const endTime = startTime + 5; //possible to withdraw funds 5seconds later 
+    const endTime = startTime + 5;
 
     //create meme Token Mint
     const memeMintKp = new web3.Keypair();
@@ -63,7 +63,7 @@ describe("withdraw payment test", async () => {
       program.programId
     );
 
-    // Send transaction
+    // initialize
     const txHash = await program.methods
       .initialize(
         new BN(minInvest),
@@ -87,6 +87,17 @@ describe("withdraw payment test", async () => {
     // Confirm transaction
     await connection.confirmTransaction(txHash);
 
+    //mint 100_000 meme token to launchpad meme token account by admin  (deposit by admin)
+    await mintTo(
+        connection,
+        owner,
+        memeMintKp.publicKey,
+        memeTokenAccountPda,
+        owner,
+        100_000
+      );
+
+
     const [userStakePda, userStakePdaBump] =
       web3.PublicKey.findProgramAddressSync(
         [
@@ -103,7 +114,7 @@ describe("withdraw payment test", async () => {
       paymentMintKp.publicKey,
       owner.publicKey //owner
     );
-
+    // mint 100_000 payment token to user's payment token account for testing..
     await mintTo(
       connection,
       owner,
@@ -115,8 +126,8 @@ describe("withdraw payment test", async () => {
 
     const buyTokenAmount = 10;
 
-    await sleep(2000); //sleep for 2 seconds to active sale
-
+    await sleep(5000); //sleep for 5 seconds to active sale
+    //buy with 10 paymentToken
     const txHash1 = await program.methods
       .buyTokens(new BN(buyTokenAmount))
       .accounts({
@@ -134,39 +145,69 @@ describe("withdraw payment test", async () => {
       .rpc();
     await connection.confirmTransaction(txHash1);
     await sleep(5000); //sleep for 5 seconds to end sale
-    
-    //withdraw payment token
-    const txHash2 = await program.methods.withdrawPayment().accounts({
-      launchpadState: launchpadStatePda,
-      launchpadPaymentTokenAccount: paymentTokenAccountPda,
-      beneficiaryPaymentTokenAccount: userPaymentTokenAccount,
-      paymentMint: paymentMintKp.publicKey,
-      signer: owner.publicKey,
-      tokenProgram: TOKEN_PROGRAM_ID,
-      systemProgram: web3.SystemProgram.programId
-    }).signers([]).rpc();
-
+    //claim token
+    //create userMemeTokenAccount
+    const userMemeTokenAccount = await createAssociatedTokenAccount(
+      connection,
+      owner, //payer
+      memeMintKp.publicKey,
+      owner.publicKey //owner
+    );
+    const txHash2 = await program.methods
+      .claimTokens()
+      .accounts({
+        launchpadState: launchpadStatePda,
+        userStake: userStakePda,
+        userMemeTokenAccount,
+        launchpadMemeTokenAccount: memeTokenAccountPda,
+        paymentMint: paymentMintKp.publicKey,
+        memeMint: memeMintKp.publicKey,
+        signer: owner.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: web3.SystemProgram.programId,
+      })
+      .signers([])
+      .rpc();
     await connection.confirmTransaction(txHash2);
 
-    const launchpadStateAccount = await program.account.launchpadState.fetch(
-      launchpadStatePda
-    );
-    //not claimed by user
-    assert(launchpadStateAccount.claimedAmount.eq(new BN(0)));
-    assert(launchpadStateAccount.totalSold.eq(new BN(buyTokenAmount)));
+    //withdraw meme
 
-    const memeTokenAccount = await getAccount(
-      connection,
-      memeTokenAccountPda
+    const txHash3 = await program.methods
+      .withdrawMeme()
+      .accounts({
+        launchpadState: launchpadStatePda,
+        launchpadMemeTokenAccount: memeTokenAccountPda,
+        beneficiaryMemeTokenAccount: userMemeTokenAccount,
+        memeMint: memeMintKp.publicKey,
+        signer: owner.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: web3.SystemProgram.programId,
+      }).signers([]).rpc();
+    await connection.confirmTransaction(txHash3);
+    const userMemeTokenAccountInfo = await getAccount(
+        connection,
+        userMemeTokenAccount
     );
-    assert(memeTokenAccount.amount == BigInt(0));
+    assert(userMemeTokenAccountInfo.amount == BigInt(100_000))
 
+    //withdraw payment
+    const txHash4 = await program.methods
+      .withdrawPayment()
+      .accounts({
+        launchpadState: launchpadStatePda,
+        launchpadPaymentTokenAccount: paymentTokenAccountPda,
+        beneficiaryPaymentTokenAccount: userPaymentTokenAccount,
+        paymentMint: paymentMintKp.publicKey,
+        signer: owner.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: web3.SystemProgram.programId,
+      }).signers([]).rpc();
+    await connection.confirmTransaction(txHash4);
     const userPaymentTokenAccountInfo = await getAccount(
-      connection,
-      userPaymentTokenAccount
+        connection,
+        userPaymentTokenAccount
     );
-    assert(
-      userPaymentTokenAccountInfo.amount == BigInt(100_000)
-    );
+    console.log("amount:", userPaymentTokenAccountInfo.amount)
+    assert(userPaymentTokenAccountInfo.amount == BigInt(100_000))
   });
 });

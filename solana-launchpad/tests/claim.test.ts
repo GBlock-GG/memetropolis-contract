@@ -11,7 +11,7 @@ import {
 } from "@solana/spl-token";
 import { sleep, getBlockTimestamp, createTokenMint } from "./utils";
 
-describe("claim test", async () => {
+describe("claim & close test", async () => {
     // Configure the client to use the local cluster.
   anchor.setProvider(anchor.AnchorProvider.env());
   const owner = anchor.Wallet.local().payer;
@@ -24,8 +24,8 @@ describe("claim test", async () => {
 
     const currentBlockTime = await getBlockTimestamp(connection);
 
-    const startTime = currentBlockTime + 10;
-    const endTime = currentBlockTime + 25;
+    const startTime = currentBlockTime + 5;
+    const endTime = startTime + 5;
 
     //create meme Token Mint
     const memeMintKp = new web3.Keypair();
@@ -63,7 +63,7 @@ describe("claim test", async () => {
       program.programId
     );
 
-    // Send transaction
+    // initialize
     const txHash = await program.methods
       .initialize(
         new BN(minInvest),
@@ -87,14 +87,15 @@ describe("claim test", async () => {
     // Confirm transaction
     await connection.confirmTransaction(txHash);
 
-    //transfer meme token to launchpad meme token account by admin
+    //mint 100_000 meme token to launchpad meme token account by admin  (deposit by admin)
     await mintTo(
         connection,
         owner,
-        memepaymentMintKp.publicKey,
-        userPaymentTokenAccount,    100_000
+        memeMintKp.publicKey,
+        memeTokenAccountPda,
+        owner,
+        100_000
       );
-
 
 
     const [userStakePda, userStakePdaBump] =
@@ -126,7 +127,7 @@ describe("claim test", async () => {
     const buyTokenAmount = 10;
 
     await sleep(5000); //sleep for 5 seconds to active sale
-
+    //buy with 10 paymentToken
     const txHash1 = await program.methods
       .buyTokens(new BN(buyTokenAmount))
       .accounts({
@@ -174,23 +175,22 @@ describe("claim test", async () => {
     );
     assert(launchpadStateAccount.claimedAmount.eq(new BN(buyTokenAmount)));
     assert(launchpadStateAccount.totalSold.eq(new BN(buyTokenAmount)));
-    const userStakeAccount = await program.account.userStake.fetch(
-      userStakePda
-    );
-    console.log(userStakeAccount);
+    const userStakePdaAccountInfo = await connection.getAccountInfo(userStakePda);
+    
+    assert(userStakePdaAccountInfo == null)
 
     const paymentTokenAccount = await getAccount(
       connection,
       paymentTokenAccountPda
     );
-    assert(paymentTokenAccount.amount == BigInt(buyTokenAmount));
+    assert(paymentTokenAccount.amount == BigInt(buyTokenAmount * tokenPrice));
 
     const userPaymentTokenAccountInfo = await getAccount(
       connection,
       userPaymentTokenAccount
     );
     assert(
-      userPaymentTokenAccountInfo.amount == BigInt(100_000 - buyTokenAmount)
+      userPaymentTokenAccountInfo.amount == BigInt(100_000 - buyTokenAmount * tokenPrice)
     );
 
     const userMemeTokenAccountInfo = await getAccount(
@@ -198,5 +198,22 @@ describe("claim test", async () => {
       userMemeTokenAccount
     );
     assert(userMemeTokenAccountInfo.amount == BigInt(buyTokenAmount));
+
+    //test close
+    const txHash3 = await program.methods
+      .closeLaunchpadAccounts()
+      .accounts({
+        launchpadState: launchpadStatePda,
+        paymentMint: paymentMintKp.publicKey,
+        memeMint: memeMintKp.publicKey,
+        signer: owner.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: web3.SystemProgram.programId,
+      })
+      .signers([])
+      .rpc();
+    //check to close launchpadtate
+    const launchpadStateAccountInfo = await connection.getAccountInfo(launchpadStatePda);
+    assert(launchpadStateAccountInfo == null)
   });
 });
