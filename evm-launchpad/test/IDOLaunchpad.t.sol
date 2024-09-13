@@ -7,6 +7,7 @@ import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/I
 
 contract IDOLaunchpadTest is Test {
     IDOLaunchpad launchpad;
+    IDOLaunchpad launchpadETH;
     IERC20Metadata paymentToken;
     IERC20Metadata memeCoinToken;
     address owner;
@@ -24,8 +25,8 @@ contract IDOLaunchpadTest is Test {
         endTime = block.timestamp + 7 days;
 
         // Deploy mock ERC20 tokens
-        paymentToken = IERC20Metadata(address(new ERC20Mock("PaymentToken", "PAY", owner, 1000 ether)));
-        memeCoinToken = IERC20Metadata(address(new ERC20Mock("MemeCoin", "MEME", owner, 1000 ether)));
+        paymentToken = IERC20Metadata(address(new ERC20Mock("PaymentToken", "PAY", owner, 0 ether)));
+        memeCoinToken = IERC20Metadata(address(new ERC20Mock("MemeCoin", "MEME", owner, 0 ether)));
 
         // Deploy the IDOLaunchpad contract
         launchpad = new IDOLaunchpad(
@@ -38,14 +39,72 @@ contract IDOLaunchpadTest is Test {
             endTime
         );
 
+        // Deploy the IDOLaunchpad contract without paymentToken
+        launchpadETH = new IDOLaunchpad(
+            address(memeCoinToken),
+            address(0),
+            tokenPrice,
+            minInvestment,
+            maxInvestment,
+            startTime,
+            endTime
+        );
+
         // Mint tokens to the user for testing
         deal(address(paymentToken), user, 100 ether);
+        // fund 10 ETH to user
+        vm.deal(user, 10 ether);
+        
+        // Mint tokens to the launchpad for testing
+        deal(address(memeCoinToken), address(launchpad), 10 ether);
+        
+    }   
+
+    function testBuyTokensWithEthBeforeSaleStart() public {
+        vm.expectRevert("Sale is not active");
+        
+        vm.startPrank(user); // Set user as msg.sender
+        uint256 amountToBuy = 1;
+        launchpadETH.buyTokens{value: 1 ether}(amountToBuy);        
+        vm.stopPrank();
+    }
+
+    function testBuyTokensWithEthAfterSaleEnd() public {
+        vm.expectRevert("Sale is not active");
+        
+        vm.startPrank(user); 
+        vm.warp(endTime + 1);
+        uint256 amountToBuy = 1;
+        launchpadETH.buyTokens{value: 1 ether}(amountToBuy);        
+        vm.stopPrank();
+    }
+
+    function testBuyTokensWithEthInsufficientETH() public {
+        vm.expectRevert("Insufficient native coin sent");
+
+        vm.startPrank(user);
+        vm.warp(startTime + 1);
+        uint256 amountToBuy = 1;
+        launchpadETH.buyTokens{value: 0.1 ether}(amountToBuy);
+        vm.stopPrank();
+    }
+
+    function testBuyTokensWithEth() public {
+        vm.startPrank(user);  
+        vm.warp(startTime + 1); // for SaleInActive 
+        uint256 amountToBuy = 1;
+        uint256 cost = amountToBuy * tokenPrice; //1ETH
+        launchpadETH.buyTokens{value: 1 ether}(amountToBuy);
+        assertEq(launchpadETH.tokensPurchased(user), amountToBuy);
+        assertEq(launchpadETH.investments(user), cost);
+        assertEq(address(launchpadETH).balance, cost);
+        vm.stopPrank();
     }
 
     function testBuyTokensWithERC20() public {
         vm.startPrank(user);
-
-        uint256 amountToBuy = 5 ether;
+        vm.warp(startTime + 1);
+        uint256 amountToBuy = 1;
         uint256 cost = amountToBuy * tokenPrice;
 
         paymentToken.approve(address(launchpad), cost);
@@ -62,7 +121,7 @@ contract IDOLaunchpadTest is Test {
         vm.warp(startTime + 1);
         vm.startPrank(user);
 
-        uint256 amountToBuy = 5 ether;
+        uint256 amountToBuy = 1;
         uint256 cost = amountToBuy * tokenPrice;
 
         paymentToken.approve(address(launchpad), cost);
@@ -72,15 +131,31 @@ contract IDOLaunchpadTest is Test {
         launchpad.claimTokens();
 
         assertEq(memeCoinToken.balanceOf(user), amountToBuy);
-        assertEq(launchpad.tokensPurchased(user), 0);
+        assertEq(launchpad.tokensPurchased(user), amountToBuy);
 
+        vm.stopPrank();
+    }
+
+    function testClaimTokensBeforeSaleEnd() public {
+        vm.warp(startTime + 1);
+        vm.startPrank(user);
+
+        uint256 amountToBuy = 1;
+        uint256 cost = amountToBuy * tokenPrice;
+
+        paymentToken.approve(address(launchpad), cost);
+        launchpad.buyTokens(amountToBuy);
+        vm.warp(endTime - 1);
+
+        vm.expectRevert("Sale has not ended yet");
+        launchpad.claimTokens();
         vm.stopPrank();
     }
 
     function testWithdrawFunds() public {
         vm.startPrank(user);
-
-        uint256 amountToBuy = 5 ether;
+        vm.warp(startTime + 1);
+        uint256 amountToBuy = 1;
         uint256 cost = amountToBuy * tokenPrice;
 
         paymentToken.approve(address(launchpad), cost);
@@ -93,6 +168,21 @@ contract IDOLaunchpadTest is Test {
 
         assertEq(paymentToken.balanceOf(owner), cost);
         assertEq(paymentToken.balanceOf(address(launchpad)), 0);
+    }
+
+    function testWithdrawFundsByNotOwner() public {
+        vm.startPrank(user);
+        vm.warp(startTime + 1);
+        uint256 amountToBuy = 1;
+        uint256 cost = amountToBuy * tokenPrice;
+
+        paymentToken.approve(address(launchpad), cost);
+        launchpad.buyTokens(amountToBuy);
+        vm.warp(endTime + 1);
+        vm.expectRevert("Only the contract owner can call this function");
+
+        launchpad.withdrawFunds(owner);
+        vm.stopPrank();
     }
 
     function testWithdrawUnsoldTokens() public {
