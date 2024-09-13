@@ -1,0 +1,21 @@
+{
+  "name": "create-oft-token",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "create-token": "npx ts-node index.ts"
+  },
+  "dependencies": {
+    "@layerzerolabs/lz-solana-sdk-v2": "^2.3.42",
+    "@solana/spl-token": "^0.4.8",
+    "@solana/web3.js": "^1.95.3",
+    "bs58": "^5.0.0",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
+  }
+}
