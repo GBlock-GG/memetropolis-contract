@@ -1,50 +1,35 @@
-// No imports needed: web3, anchor, pg and more are globally available
+import * as anchor from "@coral-xyz/anchor";
+import { Program, web3, BN } from "@coral-xyz/anchor";
+import { IdoLaunchpad } from "../target/types/ido_launchpad";
+import { getBlockTimestamp, createTokenMint } from "./utils";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { assert } from "chai";
 
-import { Connection, Signer, Keypair } from "@solana/web3.js";
-import {
-  createMint,
-} from "@solana/spl-token";
+describe("initialize test", () => {
+  // Configure the client to use the local cluster.
+  anchor.setProvider(anchor.AnchorProvider.env());
+  const owner = anchor.Wallet.local().payer;
+  const program = anchor.workspace.IdoLaunchpad as Program<IdoLaunchpad>;
+  const connection = anchor.getProvider().connection;
 
-async function createTokenMint(
-  connection: Connection,
-  payer: Signer,
-  keypair: Keypair
-) {
-  await createMint(
-    connection,
-    payer,
-    payer.publicKey,
-    payer.publicKey,
-    9,
-    keypair
-  );
-}
-
-async function getBlockTimestamp(connection: Connection): Promise<number> {
-  let slot = await connection.getSlot();
-  return await connection.getBlockTime(slot);
-}
-
-describe("Test", async () => {
   it("initialize", async () => {
     const minInvest = 1000;
     const maxInvest = 1000000;
     const tokenPrice = 10;
 
-    const currentBlockTime = await getBlockTimestamp(pg.connection);
+    const currentBlockTime = await getBlockTimestamp(connection);
 
-    const startTime = currentBlockTime + 20;
-    const endTime = currentBlockTime + 1000;
+    const startTime = currentBlockTime + 5;
+    const endTime = startTime + 5;
 
     console.log("CurrentBlockTime:", currentBlockTime);
 
     //create meme Token Mint
     const memeMintKp = new web3.Keypair();
-    await createTokenMint(pg.connection, pg.wallet.keypair, memeMintKp);
+    await createTokenMint(connection, owner, memeMintKp);
     //create payment Token Mint
     const paymentMintKp = new web3.Keypair();
-    await createTokenMint(pg.connection, pg.wallet.keypair, paymentMintKp);
+    await createTokenMint(connection, owner, paymentMintKp);
 
     console.log("MemeMint:", memeMintKp.publicKey.toBase58());
     console.log("paymentMint:", paymentMintKp.publicKey.toBase58());
@@ -55,9 +40,9 @@ describe("Test", async () => {
       [
         Buffer.from(IDO_LAUNCHPAD_SEED),
         memeMintKp.publicKey.toBuffer(),
-        pg.wallet.publicKey.toBuffer(),
+        owner.publicKey.toBuffer(),
       ],
-      pg.PROGRAM_ID
+      program.programId
     );
 
     const [memeTokenAccountPda] = web3.PublicKey.findProgramAddressSync(
@@ -66,7 +51,7 @@ describe("Test", async () => {
         launchpadStatePda.toBuffer(),
         memeMintKp.publicKey.toBuffer(),
       ],
-      pg.PROGRAM_ID
+      program.programId
     );
 
     const [paymentTokenAccountPda] = web3.PublicKey.findProgramAddressSync(
@@ -75,11 +60,11 @@ describe("Test", async () => {
         launchpadStatePda.toBuffer(),
         paymentMintKp.publicKey.toBuffer(),
       ],
-      pg.PROGRAM_ID
+      program.programId
     );
 
     // Send transaction
-    const txHash = await pg.program.methods
+    const txHash = await program.methods
       .initialize(
         new BN(minInvest),
         new BN(maxInvest),
@@ -93,23 +78,23 @@ describe("Test", async () => {
         paymentTokenAccount: paymentTokenAccountPda,
         memeMint: memeMintKp.publicKey,
         paymentMint: paymentMintKp.publicKey,
-        signer: pg.wallet.publicKey,
+        signer: owner.publicKey,
         tokenProgram: TOKEN_PROGRAM_ID,
-        systemProgram: web3.SystemProgram.programId,
+        systemProgram: anchor.web3.SystemProgram.programId,
       })
       .signers([])
       .rpc();
 
     // Confirm transaction
-    await pg.connection.confirmTransaction(txHash);
+    await connection.confirmTransaction(txHash);
 
     // Fetch the created account
-    const launchpadStateAccount = await pg.program.account.launchpadState.fetch(
+    const launchpadStateAccount = await program.account.launchpadState.fetch(
       launchpadStatePda
     );
 
     assert(
-      launchpadStateAccount.admin.toBase58() == pg.wallet.publicKey.toBase58()
+      launchpadStateAccount.admin.toBase58() == owner.publicKey.toBase58()
     );
     assert(launchpadStateAccount.bump == bump);
     assert(launchpadStateAccount.startTime.eq(new BN(startTime)));

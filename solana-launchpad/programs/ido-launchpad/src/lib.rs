@@ -1,16 +1,17 @@
-pub mod utils;
-
+use crate::utils::{create_token_account, transfer_from_launchpad, transfer_from_user};
 use anchor_lang::{
     accounts::interface_account::InterfaceAccount, prelude::*, solana_program::clock,
 };
 use anchor_spl::{
-    token::{close_account, CloseAccount, Token},
+    token::Token,
     token_interface::{Mint, TokenAccount},
 };
-use crate::utils::token::{create_token_account, transfer_from_launchpad, transfer_from_user};
+
+pub mod utils;
+
 // This is your program's public key and it will update
 // automatically when you build the project.
-declare_id!("2BgPu9XwVRDtXe1gzRzAo1npLntV55EsnwjJL6itqZGb");
+declare_id!("GghUhzqc1sYRKC13vfDzTq5XazGveP4GqxTG52U12qLZ");
 
 pub const IDO_LAUNCHPAD_SEED: &str = "ido_launchpad";
 pub const IDO_LAUNCHPAD_STATE_LEN: usize = 8 + 32 * 3 + 8 * 2 + 16 * 5 + 1 * 1;
@@ -23,16 +24,16 @@ mod ido_launchpad {
         ctx: Context<Initialize>,
         min_invest: u128,
         max_invest: u128,
-        token_price: u128,
+        token_price: u64,
         start_time: u64,
         end_time: u64,
     ) -> Result<()> {
         let block_timestamp = clock::Clock::get()?.unix_timestamp as u64;
         if start_time >= end_time || start_time <= block_timestamp || end_time <= block_timestamp {
-            return err!(ErrorCode::InvalidTime);
+            return err!(ErrCode::InvalidTime);
         }
         if token_price == 0 {
-            return err!(ErrorCode::InvalidPrice);
+            return err!(ErrCode::InvalidPrice);
         }
         //create meme_token_account
         create_token_account(
@@ -74,6 +75,7 @@ mod ido_launchpad {
         ctx.accounts.launchpad_state.end_time = end_time;
         ctx.accounts.launchpad_state.admin = ctx.accounts.signer.key();
         ctx.accounts.launchpad_state.total_sold = 0;
+        ctx.accounts.launchpad_state.claimed_amount = 0;
         ctx.accounts.launchpad_state.bump = ctx.bumps.launchpad_state;
         Ok(())
     }
@@ -81,8 +83,10 @@ mod ido_launchpad {
     pub fn buy_tokens(ctx: Context<BuyTokens>, amount: u64) -> Result<()> {
         let launchpad_state = &ctx.accounts.launchpad_state;
         let block_timestamp = clock::Clock::get()?.unix_timestamp as u64;
-        if launchpad_state.start_time > block_timestamp || launchpad_state.end_time < block_timestamp {
-            return err!(ErrorCode::InvalidSaleActive);
+        if launchpad_state.start_time > block_timestamp
+            || launchpad_state.end_time < block_timestamp
+        {
+            return err!(ErrCode::InvalidSaleActive);
         }
 
         if !ctx.accounts.user_stake.is_initialized {
@@ -90,11 +94,13 @@ mod ido_launchpad {
             ctx.accounts.user_stake.bump = ctx.bumps.user_stake;
         }
         if amount == 0 {
-            return err!(ErrorCode::InvalidAmount);
+            return err!(ErrCode::InvalidAmount);
         }
-        let cost = (amount as u128) * launchpad_state.token_price;
-        if cost < launchpad_state.min_invest || cost > launchpad_state.max_invest {
-            return err!(ErrorCode::InvalidAmount);
+        let cost = amount * launchpad_state.token_price;
+        if (cost as u128) < launchpad_state.min_invest
+            || (cost as u128) > launchpad_state.max_invest
+        {
+            return err!(ErrCode::InvalidAmount);
         }
 
         transfer_from_user(
@@ -105,13 +111,12 @@ mod ido_launchpad {
                 .to_account_info(),
             ctx.accounts.payment_mint.to_account_info(),
             ctx.accounts.token_program.to_account_info(),
-            amount,
+            cost,
             ctx.accounts.payment_mint.decimals,
         )?;
         ctx.accounts.user_stake.invests = ctx.accounts.user_stake.invests + cost;
         ctx.accounts.user_stake.purchased = ctx.accounts.user_stake.purchased + amount;
-        ctx.accounts.launchpad_state.total_sold =
-            ctx.accounts.launchpad_state.total_sold + (amount as u128);
+        ctx.accounts.launchpad_state.total_sold = ctx.accounts.launchpad_state.total_sold + amount;
 
         Ok(())
     }
@@ -120,10 +125,10 @@ mod ido_launchpad {
     pub fn claim_tokens(ctx: Context<ClaimTokens>) -> Result<()> {
         let block_timestamp = clock::Clock::get()?.unix_timestamp as u64;
         if block_timestamp <= ctx.accounts.launchpad_state.end_time {
-            return err!(ErrorCode::InvalidSaleEnd);
+            return err!(ErrCode::InvalidSaleEnd);
         }
         if ctx.accounts.user_stake.has_claimed_tokens {
-            return err!(ErrorCode::InvalidClaim);
+            return err!(ErrCode::InvalidClaim);
         }
 
         let claim_amount: u64 = ctx.accounts.user_stake.purchased;
@@ -144,22 +149,7 @@ mod ido_launchpad {
             ]],
         )?;
         ctx.accounts.launchpad_state.claimed_amount =
-            ctx.accounts.launchpad_state.claimed_amount + (claim_amount as u128);
-
-        close_account(CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
-            CloseAccount {
-                account: ctx.accounts.user_stake.to_account_info(),
-                destination: ctx.accounts.signer.to_account_info(),
-                authority: ctx.accounts.user_stake.to_account_info(),
-            },
-            &[&[
-                IDO_LAUNCHPAD_SEED.as_bytes(),
-                ctx.accounts.launchpad_state.key().as_ref(),
-                ctx.accounts.signer.key().as_ref(),
-                &[ctx.accounts.user_stake.bump],
-            ]],
-        ))?;
+            ctx.accounts.launchpad_state.claimed_amount + claim_amount;
         Ok(())
     }
     //called by admin
@@ -168,7 +158,7 @@ mod ido_launchpad {
         //check sale has ended
         let block_timestamp = clock::Clock::get()?.unix_timestamp as u64;
         if block_timestamp <= ctx.accounts.launchpad_state.end_time {
-            return err!(ErrorCode::InvalidSaleEnd);
+            return err!(ErrCode::InvalidSaleEnd);
         }
 
         let withdraw_amount: u64 = ctx.accounts.launchpad_payment_token_account.amount;
@@ -186,7 +176,7 @@ mod ido_launchpad {
             ctx.accounts.payment_mint.decimals,
             &[&[
                 IDO_LAUNCHPAD_SEED.as_bytes(),
-                ctx.accounts.launchpad_state.payment_mint.as_ref(),
+                ctx.accounts.launchpad_state.meme_mint.as_ref(),
                 ctx.accounts.launchpad_state.admin.key().as_ref(),
                 &[ctx.accounts.launchpad_state.bump],
             ]],
@@ -196,12 +186,12 @@ mod ido_launchpad {
 
     pub fn withdraw_meme(ctx: Context<WithdrawMeme>) -> Result<()> {
         let block_timestamp = clock::Clock::get()?.unix_timestamp as u64;
-        if block_timestamp <= ctx.accounts.launchpad_state.end_time {
-            return err!(ErrorCode::InvalidSaleEnd);
+        if block_timestamp < ctx.accounts.launchpad_state.end_time {
+            return err!(ErrCode::InvalidSaleEnd);
         }
         let withdraw_amount = ctx.accounts.launchpad_meme_token_account.amount
-            - ((ctx.accounts.launchpad_state.total_sold
-                - ctx.accounts.launchpad_state.claimed_amount) as u64);
+            - (ctx.accounts.launchpad_state.total_sold
+                - ctx.accounts.launchpad_state.claimed_amount);
         transfer_from_launchpad(
             ctx.accounts.launchpad_state.to_account_info(),
             ctx.accounts.launchpad_meme_token_account.to_account_info(),
@@ -214,7 +204,7 @@ mod ido_launchpad {
             ctx.accounts.meme_mint.decimals,
             &[&[
                 IDO_LAUNCHPAD_SEED.as_bytes(),
-                ctx.accounts.launchpad_state.payment_mint.as_ref(),
+                ctx.accounts.launchpad_state.meme_mint.as_ref(),
                 ctx.accounts.launchpad_state.admin.key().as_ref(),
                 &[ctx.accounts.launchpad_state.bump],
             ]],
@@ -222,109 +212,60 @@ mod ido_launchpad {
         Ok(())
     }
     pub fn close_launchpad_accounts(ctx: Context<CloseLaunchpadAccounts>) -> Result<()> {
-        // close launchpad_meme_token_account
-        close_account(CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
-            CloseAccount {
-                account: ctx.accounts.launchpad_meme_token_account.to_account_info(),
-                destination: ctx.accounts.signer.to_account_info(),
-                authority: ctx.accounts.launchpad_meme_token_account.to_account_info(),
-            },
-            &[&[
-                IDO_LAUNCHPAD_SEED.as_bytes(),
-                ctx.accounts.launchpad_state.key().as_ref(),
-                ctx.accounts.meme_mint.key().as_ref(),
-                &[ctx.bumps.launchpad_meme_token_account],
-            ]],
-        ))?;
-        // close launchpad_payment_token_account
-        close_account(CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
-            CloseAccount {
-                account: ctx
-                    .accounts
-                    .launchpad_payment_token_account
-                    .to_account_info(),
-                destination: ctx.accounts.signer.to_account_info(),
-                authority: ctx
-                    .accounts
-                    .launchpad_payment_token_account
-                    .to_account_info(),
-            },
-            &[&[
-                IDO_LAUNCHPAD_SEED.as_bytes(),
-                ctx.accounts.launchpad_state.key().as_ref(),
-                ctx.accounts.payment_mint.key().as_ref(),
-                &[ctx.bumps.launchpad_payment_token_account],
-            ]],
-        ))?;
-
-        // close launchpad_state account
-        close_account(CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
-            CloseAccount {
-                account: ctx.accounts.launchpad_state.to_account_info(),
-                destination: ctx.accounts.signer.to_account_info(),
-                authority: ctx.accounts.launchpad_state.to_account_info(),
-            },
-            &[&[
-                IDO_LAUNCHPAD_SEED.as_bytes(),
-                ctx.accounts.meme_mint.key().as_ref(),
-                ctx.accounts.signer.key().as_ref(),
-                &[ctx.accounts.launchpad_state.bump],
-            ]],
-        ))?;
+        let block_timestamp = clock::Clock::get()?.unix_timestamp as u64;
+        if ctx.accounts.launchpad_state.end_time > block_timestamp {
+            return err!(ErrCode::InvalidSaleEnd);
+        }
+        if ctx.accounts.launchpad_state.claimed_amount < ctx.accounts.launchpad_state.total_sold {
+            return err!(ErrCode::RemainedNotClaim);
+        }
         Ok(())
     }
 }
 
 #[derive(Accounts)]
 pub struct Initialize<'info> {
-    // We must specify the space in order to initialize an account.
-    // First 8 bytes are default account discriminator,
-    // next 8 bytes come from NewAccount.data being type u64.
-    // (u64 = 64 bits unsigned integer = 8 bytes)
     #[account(
-        init,
-        seeds=[IDO_LAUNCHPAD_SEED.as_bytes(), meme_mint.key().as_ref(), signer.key.as_ref()],
-        bump,
-        payer = signer,
-        space = IDO_LAUNCHPAD_STATE_LEN)
-    ]
+      init,
+      seeds=[IDO_LAUNCHPAD_SEED.as_bytes(), meme_mint.key().as_ref(), signer.key.as_ref()],
+      bump,
+      payer = signer,
+      space = IDO_LAUNCHPAD_STATE_LEN)
+  ]
     pub launchpad_state: Account<'info, LaunchpadState>,
 
-    //create token account for meme_mint
+    /// CHECK
     #[account(
-        mut,
-        seeds = [
-            IDO_LAUNCHPAD_SEED.as_bytes(),
-            launchpad_state.key().as_ref(),
-            meme_mint.key().as_ref()
-        ],
-        bump
-    )]
+      mut,
+      seeds = [
+          IDO_LAUNCHPAD_SEED.as_bytes(),
+          launchpad_state.key().as_ref(),
+          meme_mint.key().as_ref()
+      ],
+      bump
+  )]
     pub meme_token_account: UncheckedAccount<'info>,
 
-    //create token account for payment_mint
+    /// CHECK
     #[account(
-        mut,
-        seeds = [
-            IDO_LAUNCHPAD_SEED.as_bytes(),
-            launchpad_state.key().as_ref(),
-            payment_mint.key().as_ref()
-        ],
-        bump
-    )]
+      mut,
+      seeds = [
+          IDO_LAUNCHPAD_SEED.as_bytes(),
+          launchpad_state.key().as_ref(),
+          payment_mint.key().as_ref()
+      ],
+      bump
+  )]
     pub payment_token_account: UncheckedAccount<'info>,
 
     #[account(
-        mint::token_program = token_program,
-    )]
+      mint::token_program = token_program,
+  )]
     pub meme_mint: InterfaceAccount<'info, Mint>,
 
     #[account(
-        mint::token_program = token_program,
-    )]
+      mint::token_program = token_program,
+  )]
     pub payment_mint: InterfaceAccount<'info, Mint>,
 
     #[account(mut)]
@@ -336,47 +277,46 @@ pub struct Initialize<'info> {
 #[derive(Accounts)]
 pub struct BuyTokens<'info> {
     #[account(
-        mut,
-        constraint = launchpad_state.payment_mint == user_payment_token_account.mint 
-                     && launchpad_state.meme_mint == meme_mint.key()
-        
-    )]
+      mut,
+      constraint = launchpad_state.payment_mint == user_payment_token_account.mint
+                    && launchpad_state.meme_mint == meme_mint.key()
+  )]
     pub launchpad_state: Account<'info, LaunchpadState>,
 
     #[account(
-        init_if_needed,        
-        seeds=[IDO_LAUNCHPAD_SEED.as_bytes(), launchpad_state.key().as_ref(), signer.key.as_ref()],
-        bump,
-        payer = signer,
-        space = USER_STAKE_LEN
-    )]
+      init_if_needed,
+      seeds=[IDO_LAUNCHPAD_SEED.as_bytes(), launchpad_state.key().as_ref(), signer.key.as_ref()],
+      bump,
+      payer = signer,
+      space = USER_STAKE_LEN
+  )]
     pub user_stake: Account<'info, UserStake>,
 
     #[account(
-        mut,
-        token::mint = payment_mint
-    )]
+      mut,
+      token::mint = payment_mint
+  )]
     pub user_payment_token_account: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
-        mut,
-        seeds = [
-            IDO_LAUNCHPAD_SEED.as_bytes(),
-            launchpad_state.key().as_ref(),
-            payment_mint.key().as_ref()
-        ],
-        bump
-    )]
+      mut,
+      seeds = [
+          IDO_LAUNCHPAD_SEED.as_bytes(),
+          launchpad_state.key().as_ref(),
+          payment_mint.key().as_ref()
+      ],
+      bump
+  )]
     pub launchpad_payment_token_account: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
-        mint::token_program = token_program,
-    )]
+      mint::token_program = token_program,
+  )]
     pub payment_mint: InterfaceAccount<'info, Mint>,
 
     #[account(
-        mint::token_program = token_program,
-    )]
+      mint::token_program = token_program,
+  )]
     pub meme_mint: InterfaceAccount<'info, Mint>,
 
     #[account(mut)]
@@ -388,46 +328,47 @@ pub struct BuyTokens<'info> {
 #[derive(Accounts)]
 pub struct ClaimTokens<'info> {
     #[account(
-        mut,
-        constraint = launchpad_state.payment_mint == payment_mint.key()
-                     && launchpad_state.meme_mint == user_meme_token_account.mint
-                     && launchpad_state.meme_mint == meme_mint.key()
-    )]
+      mut,
+      constraint = launchpad_state.payment_mint == payment_mint.key()
+                    && launchpad_state.meme_mint == user_meme_token_account.mint
+                    && launchpad_state.meme_mint == meme_mint.key()
+  )]
     pub launchpad_state: Account<'info, LaunchpadState>,
 
     #[account(
-        mut, 
-        seeds=[IDO_LAUNCHPAD_SEED.as_bytes(), launchpad_state.key().as_ref(), signer.key.as_ref()],
-        bump,
-    )]
+      mut,
+      seeds=[IDO_LAUNCHPAD_SEED.as_bytes(), launchpad_state.key().as_ref(), signer.key.as_ref()],
+      bump,
+      close = signer
+  )]
     pub user_stake: Account<'info, UserStake>,
 
     #[account(
-        mut,
-        token::mint = meme_mint
-    )]
+      mut,
+      token::mint = meme_mint
+  )]
     pub user_meme_token_account: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
-        mut,
-        token::mint = meme_mint,
-        seeds = [
-            IDO_LAUNCHPAD_SEED.as_bytes(),
-            launchpad_state.key().as_ref(),
-            meme_mint.key().as_ref()
-        ],
-        bump
-    )]
+      mut,
+      token::mint = meme_mint,
+      seeds = [
+          IDO_LAUNCHPAD_SEED.as_bytes(),
+          launchpad_state.key().as_ref(),
+          meme_mint.key().as_ref()
+      ],
+      bump
+  )]
     pub launchpad_meme_token_account: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
-        mint::token_program = token_program,
-    )]
+      mint::token_program = token_program,
+  )]
     pub payment_mint: InterfaceAccount<'info, Mint>,
 
     #[account(
-        mint::token_program = token_program,
-    )]
+      mint::token_program = token_program,
+  )]
     pub meme_mint: InterfaceAccount<'info, Mint>,
 
     #[account(mut)]
@@ -439,36 +380,36 @@ pub struct ClaimTokens<'info> {
 #[derive(Accounts)]
 pub struct WithdrawFunds<'info> {
     #[account(
-        mut,
-        constraint = launchpad_state.payment_mint == payment_mint.key()
-                     && launchpad_state.admin == signer.key()
-    )]
+      mut,
+      constraint = launchpad_state.payment_mint == payment_mint.key()
+                    && launchpad_state.admin == signer.key()
+  )]
     pub launchpad_state: Account<'info, LaunchpadState>,
 
     #[account(
-        mut,
-        token::mint = payment_mint,
-        seeds = [
-            IDO_LAUNCHPAD_SEED.as_bytes(),
-            launchpad_state.key().as_ref(),
-            payment_mint.key().as_ref()
-        ],
-        bump
-    )]
+      mut,
+      token::mint = payment_mint,
+      seeds = [
+          IDO_LAUNCHPAD_SEED.as_bytes(),
+          launchpad_state.key().as_ref(),
+          payment_mint.key().as_ref()
+      ],
+      bump
+  )]
     pub launchpad_payment_token_account: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
-        mut,
-        token::mint = payment_mint
-    )]
+      mut,
+      token::mint = payment_mint
+  )]
     pub beneficiary_payment_token_account: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
-        mint::token_program = token_program,
-    )]
+      mint::token_program = token_program,
+  )]
     pub payment_mint: InterfaceAccount<'info, Mint>,
 
-    #[account(mut,)]
+    #[account(mut)]
     pub signer: Signer<'info>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
@@ -477,36 +418,36 @@ pub struct WithdrawFunds<'info> {
 #[derive(Accounts)]
 pub struct WithdrawMeme<'info> {
     #[account(
-        mut,
-        constraint = launchpad_state.meme_mint == meme_mint.key()
-                     && launchpad_state.admin == signer.key()
-    )]
+      mut,
+      constraint = launchpad_state.meme_mint == meme_mint.key()
+                    && launchpad_state.admin == signer.key()
+  )]
     pub launchpad_state: Account<'info, LaunchpadState>,
 
     #[account(
-        mut,
-        token::mint = meme_mint,
-        seeds = [
-            IDO_LAUNCHPAD_SEED.as_bytes(),
-            launchpad_state.key().as_ref(),
-            meme_mint.key().as_ref()
-        ],
-        bump
-    )]
+      mut,
+      token::mint = meme_mint,
+      seeds = [
+          IDO_LAUNCHPAD_SEED.as_bytes(),
+          launchpad_state.key().as_ref(),
+          meme_mint.key().as_ref()
+      ],
+      bump
+  )]
     pub launchpad_meme_token_account: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
-        mut,
-        token::mint = meme_mint
-    )]
+      mut,
+      token::mint = meme_mint
+  )]
     pub beneficiary_meme_token_account: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
-        mint::token_program = token_program,
-    )]
+      mint::token_program = token_program,
+  )]
     pub meme_mint: InterfaceAccount<'info, Mint>,
 
-    #[account(mut,)]
+    #[account(mut)]
     pub signer: Signer<'info>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
@@ -514,48 +455,25 @@ pub struct WithdrawMeme<'info> {
 #[derive(Accounts)]
 pub struct CloseLaunchpadAccounts<'info> {
     #[account(
-        mut,
-        constraint = launchpad_state.admin == signer.key() &&
-                    launchpad_state.meme_mint == meme_mint.key() &&
-                    launchpad_state.payment_mint == payment_mint.key()
-    )]
+    mut,
+    constraint = launchpad_state.admin == signer.key() &&
+                 launchpad_state.meme_mint == meme_mint.key() &&
+                 launchpad_state.payment_mint == payment_mint.key(),
+    close = signer
+  )]
     pub launchpad_state: Account<'info, LaunchpadState>,
 
     #[account(
-        mut,
-        token::mint = meme_mint,
-        seeds = [
-            IDO_LAUNCHPAD_SEED.as_bytes(),
-            launchpad_state.key().as_ref(),
-            meme_mint.key().as_ref()
-        ],
-        bump
-    )]
-    pub launchpad_meme_token_account: InterfaceAccount<'info, TokenAccount>,
-
-    #[account(
-        mut,
-        token::mint = payment_mint,
-        seeds = [
-            IDO_LAUNCHPAD_SEED.as_bytes(),
-            launchpad_state.key().as_ref(),
-            payment_mint.key().as_ref()
-        ],
-        bump
-    )]
-    pub launchpad_payment_token_account: InterfaceAccount<'info, TokenAccount>,
-
-    #[account(
-        mint::token_program = token_program,
-    )]
+      mint::token_program = token_program,
+  )]
     pub meme_mint: InterfaceAccount<'info, Mint>,
 
     #[account(
-        mint::token_program = token_program,
-    )]
+      mint::token_program = token_program,
+  )]
     pub payment_mint: InterfaceAccount<'info, Mint>,
 
-    #[account(mut,)]
+    #[account(mut)]
     pub signer: Signer<'info>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
@@ -570,9 +488,9 @@ pub struct LaunchpadState {
     pub end_time: u64,
     pub max_invest: u128,
     pub min_invest: u128,
-    pub token_price: u128,
-    pub total_sold: u128,
-    pub claimed_amount: u128,
+    pub token_price: u64,
+    pub total_sold: u64,
+    pub claimed_amount: u64,
     pub bump: u8,
 }
 
@@ -580,13 +498,13 @@ pub struct LaunchpadState {
 pub struct UserStake {
     pub is_initialized: bool,
     pub has_claimed_tokens: bool,
-    pub invests: u128,
+    pub invests: u64,
     pub purchased: u64,
     pub bump: u8,
 }
 
 #[error_code]
-pub enum ErrorCode {
+pub enum ErrCode {
     #[msg("Invalid start or end time")]
     InvalidTime,
     #[msg("Invalid token price")]
@@ -599,4 +517,6 @@ pub enum ErrorCode {
     InvalidSaleEnd,
     #[msg("Tokens already claimed")]
     InvalidClaim,
+    #[msg("RemainedNotClaim")]
+    RemainedNotClaim,
 }

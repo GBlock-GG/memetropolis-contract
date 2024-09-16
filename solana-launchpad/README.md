@@ -5,34 +5,41 @@ This project is a Solana program developed using the Anchor framework. The follo
 ## Table of Contents
 
 1. [Prerequisites](#prerequisites)
-2. [Installation](#installation)
-3. [Building the Program](#building-the-program)
-4. [Running Tests](#running-tests)
-5. [Deploying the Program](#deploying-the-program)
+2. [Building the Program](#building-the-program)
+3. [Running Tests](#running-tests)
+4. [Deploying the Program](#deploying-the-program)
 
 ## Prerequisites
-Anchor Install
-https://www.anchor-lang.com/docs/installation
+OS: Ubuntu 22
 
-## Installation
-1. Install dependencies:
-Install the necessary Rust and JavaScript dependencies:
+Rust Install
 ```sh
-anchor install
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+Solana Install
+```sh
+sh -c "$(curl -sSfL https://release.solana.com/v1.18.18/install)"
+```
+Key Generation For testing
+```sh
+solana-keygen new
+```
+
+Node.js & Yarn Install
+
+Anchor Install
+```sh
+cargo install --git https://github.com/coral-xyz/anchor --tag v0.29.0 anchor-cli
 ```
 
 ## Building the Program
-Build the Anchor program:
 ```sh
 anchor build
 ```
 
 ## Running Tests
-1. Start the local Solana validator:
-```sh
-solana-test-validator
-```
-2. Run the tests:
+Run the tests:
 ```sh
 anchor test
 ```
