@@ -1,0 +1,9 @@
+{
+    "MyOFT":{
+        "tokenName": "MyOFT",
+        "tokenSymbol": "MOFT",
+        "totalSupply": 1000000,
+        "endpoint": "0x6EDCE65403992e310A62460808c4b910D972f10f",
+        "owner":"0x0000000000000000000000000000000000000000"
+    }
+}
