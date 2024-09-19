@@ -9,3 +9,12 @@ libs = ["lib"]
 "@openzeppelin-contracts" = "5.0.2"
 "@uniswap-v2-core" = "1.0.1"
 "@uniswap-v2-periphery" = "1.1.0-beta.0"
+
+[rpc_endpoints]
+default_network = "http://127.0.0.1:8545"
+localhost = "http://127.0.0.1:8545"
+base = "https://base.meowrpc.com"
+
+[etherscan]
+localhost = { key = "" , url="http://127.0.0.1:8545"}
+base = { key = "${BASE_ETHERSCAN_API_KEY}", url = "https://api.basescan.org/api", chain=8453 }
