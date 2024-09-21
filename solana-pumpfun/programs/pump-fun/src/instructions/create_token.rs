@@ -28,8 +28,16 @@ pub fn create_token(
   symbol: String,
   uri: String,
 ) -> Result<()> {
+  let config_key = ctx.accounts.config.key();
+  let seeds = &[
+    TOKEN_MINT_AUTHORITY_SEED.as_bytes(),
+    config_key.as_ref(),
+    &[ctx.bumps.mint_authority]
+  ];
+  let signer_seeds = [&seeds[..]];
+  
   // create metadata account
-  let cpi_context = CpiContext::new(
+  let cpi_context = CpiContext::new_with_signer(
     ctx.accounts.token_metadata_program.to_account_info(),
     CreateMetadataAccountsV3 {
         metadata: ctx.accounts.metadata.to_account_info(),
@@ -40,6 +48,7 @@ pub fn create_token(
         system_program: ctx.accounts.system_program.to_account_info(),
         rent: ctx.accounts.rent.to_account_info(),
     },
+    &signer_seeds
   );
 
   let data_v2 = DataV2 {
@@ -69,15 +78,18 @@ pub struct CreateToken<'info> {
   )]
   pub token_mint: InterfaceAccount<'info, Mint>,
 
+  /// CHECK
   #[account(
+    // init_if_needed,
     seeds = [
       TOKEN_MINT_AUTHORITY_SEED.as_bytes(),
       config.key().as_ref()
     ],
-    seeds::program = system_program,
+    // payer = user,
+    // space = 8,
     bump
   )]
-  pub mint_authority: SystemAccount<'info>,
+  pub mint_authority: UncheckedAccount<'info>,
 
   #[account(
     seeds = [

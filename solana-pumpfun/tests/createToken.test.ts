@@ -1,11 +1,13 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program, web3, BN } from "@coral-xyz/anchor";
 import { PumpFun } from "../target/types/pump_fun";
-import { MPL_TOKEN_METADATA_PROGRAM_ID  } from "@metaplex-foundation/mpl-token-metadata";
+import { MPL_TOKEN_METADATA_PROGRAM_ID, safeFetchAllDeprecatedMasterEditionV1  } from "@metaplex-foundation/mpl-token-metadata";
+import { SystemProgram, Transaction, sendAndConfirmTransaction } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID, getAssociatedTokenAddressSync } from "@solana/spl-token";
 
 import { assert } from "chai";
 import { createConfig } from "./utils/create_config";
+import { sleep } from "./utils/sleep";
 
 describe("CreateToken", () => {
   // Configure the client to use the local cluster.
@@ -13,6 +15,7 @@ describe("CreateToken", () => {
 
   const program = anchor.workspace.PumpFun as Program<PumpFun>;
   const payer = anchor.Wallet.local().payer;
+  const connection = anchor.getProvider().connection;
 
   it("Create Token", async () => {
     // create Config Account
@@ -26,7 +29,7 @@ describe("CreateToken", () => {
       maxSupply,
       initSupply,
       defaultDecimals
-    )    
+    )
 
     // create Token Account
     const tokenMintKP = web3.Keypair.generate();
@@ -35,8 +38,23 @@ describe("CreateToken", () => {
         Buffer.from("pumpfun_mint_authority"),
         configPk.toBuffer()
       ],
-      web3.SystemProgram.programId
+      program.programId
     );
+
+    // const lamports = await connection.getMinimumBalanceForRentExemption(0);
+    // const txIns = SystemProgram.transfer({
+    //   fromPubkey: payer.publicKey,
+    //   lamports,
+    //   toPubkey: mintAuthorityPk,
+    // })
+    
+    // const tx0 = await sendAndConfirmTransaction(
+    //   connection,
+    //   new Transaction().add(txIns),
+    //   [payer]
+    // )
+    // console.log("createMintAuthority:", tx0);
+
 
     const [ bondingCurve ] = web3.PublicKey.findProgramAddressSync(
       [
@@ -59,12 +77,20 @@ describe("CreateToken", () => {
           tokenMintKP.publicKey.toBuffer(),
       ],
       metadata_program_id
-  );
+    );
 
-  
+    console.log('payer:', payer.publicKey.toBase58());
+    console.log('tokenMint:', tokenMintKP.publicKey.toBase58());
+    console.log('mintAuthority:', mintAuthorityPk.toBase58());
+    console.log('bondingCurve:', bondingCurve.toBase58());
+    console.log('associtedBondingCurve:', associtedBondingCurve.toBase58());
+
+    console.log('metadataAccount:', metadataPDA.toBase58());
+
+    await sleep(5000);  
     const tx = await program.methods.createToken(
       "TOKEN_NAME", //token_name
-      "TOKEN_SYMBOL", //symbol
+      "TSYM", //symbol
       "ipfs://TOKEN_URI" // uri
     ).accounts({
       tokenMint: tokenMintKP.publicKey,
