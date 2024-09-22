@@ -7,6 +7,7 @@ import "@uniswap-v2-core-1.0.1/contracts/interfaces/IUniswapV2Pair.sol";
 import "@uniswap-v2-periphery-1.1.0-beta.0/contracts/interfaces/IUniswapV2Router02.sol";
 import "@openzeppelin-contracts-5.0.2/utils/ReentrancyGuard.sol";
 import "@openzeppelin-contracts-5.0.2/access/Ownable.sol";
+import "@openzeppelin-contracts-5.0.2/token/ERC20/IERC20.sol";
 import {console} from "forge-std/console.sol";
 
 /// @title Meme Token Factory
@@ -37,7 +38,7 @@ contract TokenFactory is ReentrancyGuard, Ownable {
 
     address constant UNISWAP_V2_FACTORY_ADDRESS = 0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6;
     address constant UNISWAP_V2_ROUTER_ADDRESS = 0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24;
-
+    address constant LZ_ENDPOINT_V2_ADDRESS = 0x1a44076050125825900e736c501f859c50fE728c;
 
     uint constant DECIMALS = 10 ** 18;
     uint public constant MAX_SUPPLY = 1000000 * DECIMALS;
@@ -106,7 +107,7 @@ contract TokenFactory is ReentrancyGuard, Ownable {
 
         //should deploy the meme token, mint the initial supply to the token factory contract
         // require(msg.value>= MEMETOKEN_CREATION_PLATFORM_FEE, "fee not paid for memetoken creation");
-        Token ct = new Token(name, symbol, INIT_SUPPLY);
+        Token ct = new Token(name, symbol, INIT_SUPPLY, LZ_ENDPOINT_V2_ADDRESS, msg.sender);
         address memeTokenAddress = address(ct);
         memeToken memory newlyCreatedToken = memeToken(name, symbol, description, imageUrl, 0, memeTokenAddress, msg.sender);
         memeTokenAddresses.push(memeTokenAddress);

@@ -1,18 +1,24 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
-import "@openzeppelin-contracts-5.0.2/token/ERC20/ERC20.sol";
+import "@layerzerolabs/lz-evm-oapp-v2/contracts/oft/OFT.sol";
+import "@openzeppelin-contracts-5.0.2/access/Ownable.sol";
 
-contract Token is ERC20 {
-    address public owner;
-
-    constructor(string memory name, string memory symbol, uint initialMintValue) ERC20(name, symbol) {
+contract Token is OFT {
+    address public tokenFactoryAddress;
+    constructor(
+        string memory name,
+        string memory symbol,
+        uint256 initialMintValue,
+        address layerZeroEndpoint,
+        address owner
+    ) OFT(name, symbol, layerZeroEndpoint, owner) Ownable(owner) {
         _mint(msg.sender, initialMintValue);
-        owner = msg.sender;
+        tokenFactoryAddress = msg.sender;
     }
 
     function mint(uint mintQty, address receiver) external returns(uint){
-        require(msg.sender == owner, "Mint can only be called by the owner");
+        require(msg.sender == owner() || msg.sender == tokenFactoryAddress, "Mint can only be called by the owner or factory contract.");
         _mint(receiver, mintQty);
         return 1;
     }

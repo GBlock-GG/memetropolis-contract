@@ -4,6 +4,7 @@ pragma solidity ^0.8.13;
 import {Test, console} from "forge-std/Test.sol";
 import {TokenFactory} from "../src/TokenFactory.sol";
 import {Token} from "../src/Token.sol";
+import {SimpleToken} from "../src/mock/SimpleToken.sol";
 
 contract TokenFactoryTest is Test {
     TokenFactory public factory;
@@ -101,7 +102,7 @@ contract TokenFactoryTest is Test {
     function testWithdrawToken() public {
         // Setup initial conditions
         uint initialMintValue = 2000 * 10 ** 18;
-        Token newToken = new Token("A", "A", initialMintValue);
+        SimpleToken newToken = new SimpleToken("A", "A", initialMintValue);
         newToken.transfer(address(factory), initialMintValue);
 
         factory.withdrawTokens(address(newToken), initialMintValue);
