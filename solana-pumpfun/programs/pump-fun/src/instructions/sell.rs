@@ -2,77 +2,59 @@ use anchor_lang::{prelude::*, solana_program::{program::invoke, system_instructi
 use anchor_spl::{
   associated_token::AssociatedToken,
   token_interface::{ Mint, TokenAccount },
-  token::{
-    mint_to,
-    Token,
-    MintTo
-  }
+  token::Token,
 };
 use crate::error::ErrorCode;
 use crate::states::*;
 use crate::utils::*;
 
-pub fn buy(
-  ctx: Context<Buy>,
-  amount: u64,  //buy Amount
-  max_sol_cost: u64 // max Sol amount for slippage
+pub fn sell(
+  ctx: Context<Sell>,
+  amount: u64,  //sell token Amount
+  min_sol_output: u64 // max Sol amount for slippage
 ) -> Result<()> {
-
   let decimals = (10 as u64).pow(ctx.accounts.token_mint.decimals as u32);
-  let current_supply = ctx.accounts.token_mint.supply;
-  let available_qty = ctx.accounts.config.max_supply * decimals - current_supply;
-  assert!(amount < available_qty, "Not enough available supply");
 
-  let current_supply_scaled = (current_supply - ctx.accounts.config.init_supply * decimals) / decimals;
-  let required_lamports = calculate_cost(current_supply_scaled, amount/decimals);
-  
-  assert!(max_sol_cost >= required_lamports, "Incorrect value of SOL sent");
-
-  //transfer sol to vault  
-  transfer_sol(
-    ctx.accounts.user.to_account_info(),
-    ctx.accounts.bonding_curve.to_account_info(),
-    required_lamports
+  // transfer from user to vault
+  transfer_token_from_user_to_vault(
+    ctx.accounts.user.to_account_info(),//authority
+    ctx.accounts.associted_user_token_account.to_account_info(), // sender user's token account
+    ctx.accounts.associted_bonding_curve.to_account_info(),
+    ctx.accounts.token_mint.to_account_info(),
+    ctx.accounts.token_program.to_account_info(),
+    amount,
+    ctx.accounts.token_mint.decimals
   )?;
-  //transfer fee
-  
-  //mint the tokens
-  //mint_to
-  let config_key = ctx.accounts.config.key();
-  let seeds = &[
-    TOKEN_MINT_AUTHORITY_SEED.as_bytes(),
-    config_key.as_ref(),
-    &[ctx.bumps.mint_authority]
+  let sol_amount = amount * INITIAL_PRICE / decimals;
+  assert!(sol_amount >= min_sol_output, "Incorrect value of SOL sent");
+
+  let token_mint_key = ctx.accounts.token_mint.key();
+  let seeds: &[&[u8]; 3] = &[
+    BONDING_CURVE_SEED.as_bytes(),
+    token_mint_key.as_ref(),
+    &[ctx.bumps.bonding_curve]
   ];
   let signer_seeds = [&seeds[..]];
 
-  let mint_to_cpi_context = CpiContext::new_with_signer(
-    ctx.accounts.token_program.to_account_info(),
-    MintTo {
-      mint: ctx.accounts.token_mint.to_account_info(),
-      to: ctx.accounts.associted_user_token_account.to_account_info(),
-      authority: ctx.accounts.mint_authority.to_account_info(),
-    },
-    &signer_seeds
-  );
-
-  mint_to(
-    mint_to_cpi_context,
-    amount,
+  //transfer sol from vault to user
+  transfer_sol_from_vault_to_user(
+    ctx.accounts.bonding_curve.to_account_info(),
+    ctx.accounts.user.to_account_info(),
+    sol_amount,
+    &signer_seeds,
   )?;
-
   Ok(())
 }
 
 #[derive(Accounts)]
-pub struct Buy<'info> {
+pub struct Sell<'info> {
 
   #[account(
     mint::authority = mint_authority,
     mint::token_program = token_program,
   )]
   pub token_mint: InterfaceAccount<'info, Mint>,
-
+  
   /// CHECKED
   #[account(
     seeds = [
@@ -101,12 +83,17 @@ pub struct Buy<'info> {
     bump,
   )]
   pub bonding_curve: UncheckedAccount<'info>,
-
+  
   #[account(
-    init,
+    associated_token::mint = token_mint,
+    associated_token::authority = bonding_curve,
+    token::token_program = token_program,
+  )]
+  pub associted_bonding_curve: InterfaceAccount<'info, TokenAccount>,
+  
+  #[account(
     associated_token::mint = token_mint,
     associated_token::authority = user,
-    payer = user,
     token::token_program = token_program,
   )]
   pub associted_user_token_account: InterfaceAccount<'info, TokenAccount>,

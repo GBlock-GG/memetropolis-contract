@@ -2,25 +2,20 @@ use anchor_lang::prelude::*;
 // use crate::error::ErrorCode;
 use anchor_spl::{
   associated_token::AssociatedToken,
-  token_interface::{ Mint, TokenAccount },
-  token::Token,
   metadata::{
-    Metadata,
     create_metadata_accounts_v3,
-    CreateMetadataAccountsV3,
     mpl_token_metadata::{
-      types::DataV2,
       accounts::Metadata as MetadataAccount,
+      types::DataV2
     },
-  }
+    CreateMetadataAccountsV3,
+    Metadata
+  },
+  token::{self, mint_to, Token},
+  token_interface::{Mint, TokenAccount},
 };
 
-
 use crate::states::*;
-
-pub const TOKEN_SEED: &str = "pumpfun_token";
-pub const TOKEN_MINT_AUTHORITY_SEED: &str = "pumpfun_mint_authority";
-pub const BONDING_CURVE_SEED: &str = "pumpfun_bonding_curve";
 
 pub fn create_token(
   ctx: Context<CreateToken>,
@@ -62,6 +57,22 @@ pub fn create_token(
   };
   
   create_metadata_accounts_v3(cpi_context, data_v2, false, true, None)?;
+  //mint_to
+  let mint_to_cpi_context = CpiContext::new_with_signer(
+    ctx.accounts.token_program.to_account_info(),
+    token::MintTo {
+      mint: ctx.accounts.token_mint.to_account_info(),
+      to: ctx.accounts.associted_user_token_account.to_account_info(),
+      authority: ctx.accounts.mint_authority.to_account_info(),
+    },
+    &signer_seeds
+  );
+  let decimals = (10 as u64).wrapping_pow(8);
+
+  mint_to(
+    mint_to_cpi_context,
+    ctx.accounts.config.init_supply * decimals,
+  )?;
 
   Ok(())
 }
@@ -80,13 +91,13 @@ pub struct CreateToken<'info> {
 
   /// CHECK
   #[account(
-    // init_if_needed,
+    init_if_needed,
     seeds = [
       TOKEN_MINT_AUTHORITY_SEED.as_bytes(),
       config.key().as_ref()
     ],
-    // payer = user,
-    // space = 8,
+    payer = user,
+    space = 8,
     bump
   )]
   pub mint_authority: UncheckedAccount<'info>,
@@ -121,7 +132,16 @@ pub struct CreateToken<'info> {
     token::token_program = token_program,
   )]
   pub associted_bonding_curve: InterfaceAccount<'info, TokenAccount>,
-  
+
+  #[account(
+    init,
+    associated_token::mint = token_mint,
+    associated_token::authority = user,
+    payer = user,
+    token::token_program = token_program,
+  )]
+  pub associted_user_token_account: InterfaceAccount<'info, TokenAccount>,
+ 
   /// CHECK
   #[account(
     mut,

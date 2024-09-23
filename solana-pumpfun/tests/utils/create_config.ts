@@ -7,8 +7,7 @@ export const createConfig = async (
     maxSupply: BN,
     initSupply: BN,
     defaultDecimals: number
-
-)=>{
+) => {
     const fee_receipt_kp = web3.Keypair.generate();
     
     const authorityPk = payer.publicKey; //admin

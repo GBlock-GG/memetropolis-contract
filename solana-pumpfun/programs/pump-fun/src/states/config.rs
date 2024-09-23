@@ -1,6 +1,9 @@
 use anchor_lang::prelude::*;
 
 pub const CONFIG_SEED: &str = "pumpfun_config";
+pub const TOKEN_SEED: &str = "pumpfun_token";
+pub const TOKEN_MINT_AUTHORITY_SEED: &str = "pumpfun_mint_authority";
+pub const BONDING_CURVE_SEED: &str = "pumpfun_bonding_curve";
 
 #[account]
 pub struct Config {

@@ -1,12 +1,13 @@
 pub mod states;
 pub mod instructions;
+pub mod utils;
 
 use anchor_lang::prelude::*;
 
 
 use instructions::*;
 
-declare_id!("8P7D8TFQqcpTpuejoGQugjD68aKEimG2d3BL15SUnDdW");
+declare_id!("DT2ovnYP2YHS6DWEQJ9ARHgznY97cydTcmkGAESfaagC");
 
 #[program]
 pub mod pump_fun {
@@ -63,9 +64,12 @@ pub mod pump_fun {
     instructions::create_token(ctx, name, symbol, uri)
   }
 
-  pub fn buy(ctx:Context<Buy>) -> Result<()> {
-    instructions::buy(ctx)
+  pub fn buy(ctx:Context<Buy>, amount: u64, max_sol_cost: u64) -> Result<()> {
+    instructions::buy(ctx, amount, max_sol_cost)
   }
 
+  pub fn sell(ctx:Context<Sell>, amount: u64, min_sol_output: u64) -> Result<()> {
+    instructions::sell(ctx,amount, min_sol_output)
+  }
   
 }
