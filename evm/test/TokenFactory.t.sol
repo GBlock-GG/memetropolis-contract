@@ -11,7 +11,16 @@ contract TokenFactoryTest is Test {
     uint constant DECIMALS = 10 ** 18;
 
     function setUp() public {
-        factory = new TokenFactory(address(this));
+        uint MEMECOIN_FUNDING_GOAL = 20 ether;
+        uint TOKEN_CREATOR_BONUS = 0.12 ether;
+        uint PLATFORM_FEE = 0.6 ether;
+        factory = new TokenFactory(
+            address(this),
+            MEMECOIN_FUNDING_GOAL,
+            TOKEN_CREATOR_BONUS,
+            PLATFORM_FEE,
+            address(this)
+        );
     }
 
     function test_CreateToken() public {
@@ -26,23 +35,20 @@ contract TokenFactoryTest is Test {
         Token token = Token(tokenAddress);
         
         // Buy 20K tokens initially
-        uint currentSupplyScaled = (token.totalSupply() - factory.INIT_SUPPLY()) / DECIMALS;
-        uint tokenQty = 20000;
-        uint requiredEth = factory.calculateCost(currentSupplyScaled, tokenQty);
-        assertEq(requiredEth, tokenQty * factory.INITIAL_PRICE());
+        uint tokenQty = 20000 * 10 ** 18;
+        uint requiredEth = factory.getRequiredEth(tokenAddress, tokenQty);
+        assertEq(requiredEth, tokenQty * factory.INITIAL_PRICE() / DECIMALS);
         
         factory.buyMemeToken{value: requiredEth}(tokenAddress, tokenQty);
-        assertEq(token.balanceOf(address(this)), tokenQty * DECIMALS);
+        assertEq(token.balanceOf(address(this)), tokenQty);
 
         // Buy 10K tokens more
-        currentSupplyScaled = (token.totalSupply() - factory.INIT_SUPPLY()) / DECIMALS;
-        console.log("Current Supply Scaled: ", currentSupplyScaled);
-        uint tokenQty2 = 10000;
-        requiredEth = factory.calculateCost(currentSupplyScaled, tokenQty2);
+        uint tokenQty2 = 10000 * 10 ** 18;
+        requiredEth = factory.getRequiredEth(tokenAddress, tokenQty2);
         console.log("Required ETH: ", requiredEth);
         
         factory.buyMemeToken{value: requiredEth}(tokenAddress, tokenQty2);
-        assertEq(token.balanceOf(address(this)), (tokenQty + tokenQty2) * DECIMALS);
+        assertEq(token.balanceOf(address(this)), (tokenQty + tokenQty2));
     }
 
     function test_SellMemeToken() public {
@@ -50,13 +56,12 @@ contract TokenFactoryTest is Test {
         Token token = Token(tokenAddress);
         
         // Buy 20K tokens
-        uint currentSupplyScaled = (token.totalSupply() - factory.INIT_SUPPLY()) / DECIMALS;
-        uint tokenQty = 20000;
-        uint requiredEth = factory.calculateCost(currentSupplyScaled, tokenQty);
-        assertEq(requiredEth, tokenQty * factory.INITIAL_PRICE());
+        uint tokenQty = 20000 * 10 ** 18;
+        uint requiredEth = factory.getRequiredEth(tokenAddress, tokenQty);
+        assertEq(requiredEth, tokenQty * factory.INITIAL_PRICE() / DECIMALS);
         
         factory.buyMemeToken{value: requiredEth}(tokenAddress, tokenQty);
-        assertEq(token.balanceOf(address(this)), tokenQty * DECIMALS);
+        assertEq(token.balanceOf(address(this)), tokenQty);
 
         // Sell 10K tokens
         uint sellTokenQty = 10000 * 10 ** 18;
@@ -78,13 +83,12 @@ contract TokenFactoryTest is Test {
         Token token = Token(tokenAddress);
         
         // Buy 20K tokens initially
-        uint currentSupplyScaled = (token.totalSupply() - factory.INIT_SUPPLY()) / DECIMALS;
-        uint tokenQty = 800000;
-        uint requiredEth = factory.calculateCost(currentSupplyScaled, tokenQty);
-        assertEq(requiredEth, tokenQty * factory.INITIAL_PRICE());
+        uint tokenQty = 80000 * 10 ** 18;
+        uint requiredEth = factory.getRequiredEth(tokenAddress, tokenQty);
+        assertEq(requiredEth, tokenQty * factory.INITIAL_PRICE() / DECIMALS);
         
         factory.buyMemeToken{value: requiredEth}(tokenAddress, tokenQty);
-        assertEq(token.balanceOf(address(this)), tokenQty * DECIMALS);
+        assertEq(token.balanceOf(address(this)), tokenQty);
     }
 
     function testWithdrawETH() public {
