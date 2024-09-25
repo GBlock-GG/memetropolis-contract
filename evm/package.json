@@ -5,7 +5,7 @@
     "build": "forge build",
     "test": "forge test",
     "deploy": "make deploy-local",
-    "deploy:base": "make deploy-base"
+    "deploy:bnbTestnet": "make deploy-bnbTestnet"
   },
   "dependencies": {
     "@layerzerolabs/lz-evm-oapp-v2": "^2.3.42",
