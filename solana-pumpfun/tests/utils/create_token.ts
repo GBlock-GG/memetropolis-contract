@@ -36,7 +36,6 @@ export const createToken = async (
   const associtedUserTokenAccount = getAssociatedTokenAddressSync(
     tokenMintKP.publicKey,
     payer.publicKey,
-    true,
   )
 
   const metadata_program_id = new web3.PublicKey(MPL_TOKEN_METADATA_PROGRAM_ID)
@@ -59,7 +58,7 @@ export const createToken = async (
     config: configPk,
     bondingCurve,
     associtedBondingCurve,
-    // associtedUserTokenAccount,
+    associtedUserTokenAccount,
     metadata: metadataPDA,
     user: payer.publicKey,
     associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
@@ -74,6 +73,7 @@ export const createToken = async (
     mintAuthorityPk,
     bondingCurve,
     associtedBondingCurve,
+    associtedUserTokenAccount,
     metadataPDA
   }
 }

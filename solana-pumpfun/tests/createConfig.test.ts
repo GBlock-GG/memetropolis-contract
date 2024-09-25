@@ -13,8 +13,8 @@ describe("CreateConfig", () => {
   const payer = anchor.Wallet.local().payer;
 
   it("Create Config", async () => {
-    const maxSupply = new BN(1_000_000);
-    const initSupply = new BN(200_000);
+    const maxSupply = new BN(1_000_000_000_000); //with_decimal
+    const initSupply = new BN(200_000_000_000);  //with_decimal
     const defaultDecimals = 6;
 
     const { fee_receipt_kp, configPk } = await createConfig(
@@ -30,9 +30,9 @@ describe("CreateConfig", () => {
       configPk
     );
     assert( configAccount.authority.toBase58() === payer.publicKey.toBase58() )
-    assert( configAccount.defaultDecimals === 6 )
+    assert( configAccount.defaultDecimals === defaultDecimals )
     assert( configAccount.feeRecipient.toBase58() === fee_receipt_kp.publicKey.toBase58() )
-    assert( configAccount.maxSupply.eq(new BN(1_000_000)) )
-    assert( configAccount.initSupply.eq(new BN(200_000)) )
+    assert( configAccount.maxSupply.eq(maxSupply) )
+    assert( configAccount.initSupply.eq(initSupply) )
   });
 });

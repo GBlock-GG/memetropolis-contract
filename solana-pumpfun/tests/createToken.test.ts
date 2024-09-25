@@ -4,9 +4,10 @@ import { PumpFun } from "../target/types/pump_fun";
 import { assert } from "chai";
 import { createConfig } from "./utils/create_config";
 import { createToken } from "./utils/create_token";
-import { fetchMetadata, mplTokenMetadata, findMetadataPda } from "@metaplex-foundation/mpl-token-metadata";
+import { fetchMetadata, mplTokenMetadata, findMetadataPda, fetchDigitalAsset  } from "@metaplex-foundation/mpl-token-metadata";
 import { createUmi } from '@metaplex-foundation/umi-bundle-defaults'
 import { PublicKey, publicKey } from "@metaplex-foundation/umi";
+import { getMint, getAccount } from "@solana/spl-token"
 
 describe("CreateToken", () => {
   // Configure the client to use the local cluster.
@@ -15,8 +16,7 @@ describe("CreateToken", () => {
   const program = anchor.workspace.PumpFun as Program<PumpFun>;
   const payer = anchor.Wallet.local().payer;
   const connection = anchor.getProvider().connection;
-  const umi = createUmi(connection.rpcEndpoint).use(mplTokenMetadata())
-  console.log(connection.rpcEndpoint)
+  const umi = createUmi(connection).use(mplTokenMetadata())
 
   it("Create Token", async () => {
     // create Config Account
@@ -36,6 +36,7 @@ describe("CreateToken", () => {
       tokenMint,
       mintAuthorityPk,
       bondingCurve,
+      associtedUserTokenAccount,
       associtedBondingCurve,
       metadataPDA
     } = await createToken(
@@ -53,14 +54,27 @@ describe("CreateToken", () => {
     console.log('bondingCurve:', bondingCurve.toBase58());
     console.log('associtedBondingCurve:', associtedBondingCurve.toBase58());
     console.log('metadataAccount:', metadataPDA.toBase58());
+    
+    const mint  = await getMint(connection, tokenMint)
+    assert( mint.decimals === 6)
+    assert( mint.mintAuthority.toBase58() === mintAuthorityPk.toBase58())
+    assert( mint.freezeAuthority == null)
 
-    const metadataInfo = await connection.getAccountInfo(metadataPDA)
+    const metadataInfo = await fetchMetadata(umi, publicKey(metadataPDA.toBase58()))
+    assert( metadataInfo.name === "TOKEN_NAME")
+    assert( metadataInfo.symbol === "TSYM")
+    assert( metadataInfo.uri === "ipfs://TOKEN_URI")
 
-    const metadatapda = findMetadataPda(umi, {
-      mint: publicKey(tokenMint),
-    })
-    console.log(metadatapda)
-    const res = await fetchMetadata(umi, metadatapda)
-    console.log(res)
+    const userTokenAccount = await getAccount(connection, associtedUserTokenAccount)
+    assert( userTokenAccount.amount === BigInt(0)) 
+    assert( userTokenAccount.mint.toBase58() === tokenMint.toBase58())
+    assert( userTokenAccount.owner.toBase58() === payer.publicKey.toBase58())
+
+    
+    const associtedBondingCurveInfo = await getAccount(connection, associtedBondingCurve)
+    assert( associtedBondingCurveInfo.amount === BigInt(maxSupply.toNumber() * (10 **defaultDecimals))) 
+    assert( associtedBondingCurveInfo.mint.toBase58() === tokenMint.toBase58())
+    assert( associtedBondingCurveInfo.owner.toBase58() === bondingCurve.toBase58())
+
   });
 });

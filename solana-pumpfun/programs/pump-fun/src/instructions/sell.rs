@@ -1,4 +1,4 @@
-use anchor_lang::{prelude::*, solana_program::{program::invoke, system_instruction, system_program}};
+use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
   token_interface::{ Mint, TokenAccount },
@@ -15,7 +15,7 @@ pub fn sell(
 ) -> Result<()> {
   let decimals = (10 as u64).pow(ctx.accounts.token_mint.decimals as u32);
 
-  // transfer from user to vault
+  // transfer token from user to vault
   transfer_token_from_user_to_vault(
     ctx.accounts.user.to_account_info(),//authority
     ctx.accounts.associted_user_token_account.to_account_info(), // sender user's token account
@@ -28,20 +28,11 @@ pub fn sell(
   let sol_amount = amount * INITIAL_PRICE / decimals;
   assert!(sol_amount >= min_sol_output, "Incorrect value of SOL sent");
 
-  let token_mint_key = ctx.accounts.token_mint.key();
-  let seeds: &[&[u8]; 3] = &[
-    BONDING_CURVE_SEED.as_bytes(),
-    token_mint_key.as_ref(),
-    &[ctx.bumps.bonding_curve]
-  ];
-  let signer_seeds = [&seeds[..]];
-
   //transfer sol from vault to user
   transfer_sol_from_vault_to_user(
     ctx.accounts.bonding_curve.to_account_info(),
     ctx.accounts.user.to_account_info(),
     sol_amount,
-    &signer_seeds,
   )?;
   Ok(())
 }
@@ -50,32 +41,13 @@ pub fn sell(
 pub struct Sell<'info> {
 
   #[account(
-    mint::authority = mint_authority,
     mint::token_program = token_program,
   )]
   pub token_mint: InterfaceAccount<'info, Mint>,
   
-  /// CHECKED
-  #[account(
-    seeds = [
-      TOKEN_MINT_AUTHORITY_SEED.as_bytes(),
-      config.key().as_ref()
-    ],
-    bump
-  )]
-  pub mint_authority: UncheckedAccount<'info>,
-
-  #[account(
-    seeds = [
-      CONFIG_SEED.as_bytes(),
-      config.authority.as_ref(),
-    ],
-    bump
-  )]
-  pub config: Account<'info, Config>,
-  
   /// CHECK
   #[account(
+    mut,
     seeds = [
       BONDING_CURVE_SEED.as_bytes(),
       token_mint.key().as_ref()
@@ -85,6 +57,7 @@ pub struct Sell<'info> {
   pub bonding_curve: UncheckedAccount<'info>,
   
   #[account(
+    mut,
     associated_token::mint = token_mint,
     associated_token::authority = bonding_curve,
     token::token_program = token_program,
@@ -92,6 +65,7 @@ pub struct Sell<'info> {
   pub associted_bonding_curve: InterfaceAccount<'info, TokenAccount>,
   
   #[account(
+    mut,
     associated_token::mint = token_mint,
     associated_token::authority = user,
     token::token_program = token_program,

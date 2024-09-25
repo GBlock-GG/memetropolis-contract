@@ -57,21 +57,20 @@ pub fn create_token(
   };
   
   create_metadata_accounts_v3(cpi_context, data_v2, false, true, None)?;
-  //mint_to
+  //mint_to to bonding curve
   let mint_to_cpi_context = CpiContext::new_with_signer(
     ctx.accounts.token_program.to_account_info(),
     token::MintTo {
       mint: ctx.accounts.token_mint.to_account_info(),
-      to: ctx.accounts.associted_user_token_account.to_account_info(),
+      to: ctx.accounts.associted_bonding_curve.to_account_info(),
       authority: ctx.accounts.mint_authority.to_account_info(),
     },
     &signer_seeds
   );
-  let decimals = (10 as u64).wrapping_pow(8);
 
   mint_to(
     mint_to_cpi_context,
-    ctx.accounts.config.init_supply * decimals,
+    ctx.accounts.config.max_supply,
   )?;
 
   Ok(())
@@ -109,7 +108,7 @@ pub struct CreateToken<'info> {
     ],
     bump
   )]
-  pub config: Account<'info, Config>,
+  pub config: Box<Account<'info, Config>>,
 
   /// CHECK
   #[account(
@@ -131,7 +130,7 @@ pub struct CreateToken<'info> {
     payer = user,
     token::token_program = token_program,
   )]
-  pub associted_bonding_curve: InterfaceAccount<'info, TokenAccount>,
+  pub associted_bonding_curve: Box<InterfaceAccount<'info, TokenAccount>>,
 
   #[account(
     init,
@@ -140,7 +139,7 @@ pub struct CreateToken<'info> {
     payer = user,
     token::token_program = token_program,
   )]
-  pub associted_user_token_account: InterfaceAccount<'info, TokenAccount>,
+  pub associted_user_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
  
   /// CHECK
   #[account(
