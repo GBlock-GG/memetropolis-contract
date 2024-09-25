@@ -16,10 +16,4 @@ contract Token is OFT {
         _mint(msg.sender, initialMintValue);
         tokenFactoryAddress = msg.sender;
     }
-
-    function mint(uint mintQty, address receiver) external returns(uint){
-        require(msg.sender == owner() || msg.sender == tokenFactoryAddress, "Mint can only be called by the owner or factory contract.");
-        _mint(receiver, mintQty);
-        return 1;
-    }
 }
