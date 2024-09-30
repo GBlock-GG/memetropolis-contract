@@ -11,12 +11,10 @@ contract TokenFactoryTest is Test {
     uint constant DECIMALS = 10 ** 18;
 
     function setUp() public {
-        uint MEMECOIN_FUNDING_GOAL = 20 ether;
         uint TOKEN_CREATOR_BONUS = 0.12 ether;
         uint PLATFORM_FEE = 0.6 ether;
         factory = new TokenFactory(
             address(this),
-            MEMECOIN_FUNDING_GOAL,
             TOKEN_CREATOR_BONUS,
             PLATFORM_FEE,
             address(this)

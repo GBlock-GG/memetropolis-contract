@@ -10,13 +10,11 @@ contract DeployTokenFactory is Script {
         // Start broadcasting the deployment transaction
         vm.startBroadcast();
 
-        uint MEMECOIN_FUNDING_GOAL = 20 ether;
         uint TOKEN_CREATOR_BONUS = 0.12 ether;
         uint PLATFORM_FEE = 0.6 ether;
 
         TokenFactory factory = new TokenFactory(
             msg.sender,
-            MEMECOIN_FUNDING_GOAL,
             TOKEN_CREATOR_BONUS,
             PLATFORM_FEE,
             msg.sender
