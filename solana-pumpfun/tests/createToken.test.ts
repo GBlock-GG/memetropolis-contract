@@ -24,7 +24,7 @@ describe("CreateToken", () => {
     const initSupply = new BN(200_000);
     const defaultDecimals = 6;
 
-    const { fee_receipt_kp, configPk } = await createConfig(
+    const { configPk } = await createConfig(
       program,
       payer,
       maxSupply,

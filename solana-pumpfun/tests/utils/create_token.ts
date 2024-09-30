@@ -1,6 +1,7 @@
 import { Program, web3, BN } from "@coral-xyz/anchor";
 import { getAssociatedTokenAddressSync, ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { MPL_TOKEN_METADATA_PROGRAM_ID  } from "@metaplex-foundation/mpl-token-metadata";
+import { PublicKey } from "@solana/web3.js";
 
 export const createToken = async (
   program: Program,
@@ -9,7 +10,14 @@ export const createToken = async (
   tokenName: string,
   tokenSymbol: string,
   tokenUri: string,
-) => {
+):Promise<{
+  tokenMint: PublicKey,
+  mintAuthorityPk: PublicKey,
+  bondingCurve: PublicKey,
+  associtedBondingCurve: PublicKey,
+  associtedUserTokenAccount: PublicKey,
+  metadataPDA: PublicKey,
+}> => {
   const tokenMintKP = web3.Keypair.generate();
   const [ mintAuthorityPk ] = web3.PublicKey.findProgramAddressSync(
     [

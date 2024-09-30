@@ -20,7 +20,7 @@ describe("SellToken", () => {
     const initSupply = new BN(200_000_000_000);  //with_decimal
     const defaultDecimals = 6
 
-    const { fee_receipt_kp, configPk } = await createConfig(
+    const { configPk } = await createConfig(
       program,
       payer,
       maxSupply,
@@ -80,9 +80,9 @@ describe("SellToken", () => {
     //check sol amount for vault
     assert(oldBondingCurveInfo.lamports - newBondingCurveInfo.lamports === 8000 * 1000) //initial_price * token_amount
     //check token amount for vault
-    assert(newAssocitedBondingInfo.amount - oldAssocitedBondingInfo.amount === BigInt(sellAmount.toNumber()))
+    assert(BigInt(newAssocitedBondingInfo.amount - oldAssocitedBondingInfo.amount) === BigInt(sellAmount.toNumber()))
     //check token amount for user
-    assert(oldAssocitedUserTokenAccount.amount - newAssocitedUserTokenAccount.amount === BigInt(sellAmount.toNumber()))
+    assert(BigInt(oldAssocitedUserTokenAccount.amount - newAssocitedUserTokenAccount.amount) === BigInt(sellAmount.toNumber()))
 
 
   })

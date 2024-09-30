@@ -1,42 +1,41 @@
 use std::ops::DerefMut;
 
-use anchor_lang::prelude::*;
 use crate::states::*;
+use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
 pub struct UpdateConfig<'info> {
-  /// Admin address
-  #[account(
+    /// Admin address
+    #[account(
       mut,
-      address = config.authority
+      address = crate::admin::id()
   )]
-  pub authority: Signer<'info>,
+    pub authority: Signer<'info>,
 
-  #[account(
+    #[account(
       seeds=[
         CONFIG_SEED.as_bytes(),
         &authority.key.as_ref()
       ],
       bump,
   )]
-  pub config : Account<'info, Config>
+    pub config: Account<'info, Config>,
 }
 
 pub fn update_config(
-  ctx: Context<UpdateConfig>,
-  fee_recipient: Pubkey,
-  max_supply: u64,
-  init_supply: u64,
-  default_decimals: u8
+    ctx: Context<UpdateConfig>,
+    fee_recipient: Pubkey,
+    max_supply: u64,
+    init_supply: u64,
+    default_decimals: u8,
 ) -> Result<()> {
-  let config = ctx.accounts.config.deref_mut();
+    let config = ctx.accounts.config.deref_mut();
 
-  config.initialized = true;
-  config.authority = ctx.accounts.authority.key();
-  config.fee_recipient = fee_recipient;
-  config.max_supply = max_supply;
-  config.init_supply = init_supply;
-  config.default_decimals = default_decimals;
-  Ok(())
+    config.initialized = true;
+    config.authority = ctx.accounts.authority.key();
+    config.fee_recipient = fee_recipient;
+    config.max_supply = max_supply;
+    config.init_supply = init_supply;
+    config.default_decimals = default_decimals;
+    Ok(())
 }
-

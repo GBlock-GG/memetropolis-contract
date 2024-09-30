@@ -1,17 +1,20 @@
 
-import { Program, web3, BN } from "@coral-xyz/anchor";
-
+import { Program, BN } from "@coral-xyz/anchor";
+import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
 export const createConfig = async (
     program: Program,
-    payer: web3.Keypair,
+    payer: Keypair,
     maxSupply: BN,
     initSupply: BN,
     defaultDecimals: number
-) => {
-    const fee_receipt_kp = web3.Keypair.generate();
+): Promise<{
+  feeReceiptPk: PublicKey,
+  configPk: PublicKey,
+}> => {
+    const feeReceiptKp = Keypair.generate();
     
     const authorityPk = payer.publicKey; //admin
-    const[ configPk ] = web3.PublicKey.findProgramAddressSync(
+    const[ configPk ] = PublicKey.findProgramAddressSync(
       [
         Buffer.from("pumpfun_config"),
         authorityPk.toBuffer()
@@ -21,21 +24,21 @@ export const createConfig = async (
 
 
     const tx = await program.methods.createConfig(
-      fee_receipt_kp.publicKey,  //fee_receipt
+      feeReceiptKp.publicKey,  //fee_receipt
       maxSupply, //max_supply
       initSupply, //init_supply
       defaultDecimals, //default_decimals
     ).accounts({
       authority: authorityPk,
       config: configPk,
-      systemProgram: web3.SystemProgram.programId,
+      systemProgram: SystemProgram.programId,
     }).signers([])
     .rpc();
 
     console.log("Your transaction signature:", tx);
     console.log("configPk:", configPk.toBase58())
     return {
-        fee_receipt_kp,
-        configPk,
+      feeReceiptPk: feeReceiptKp.publicKey,
+      configPk,
     }
 }
