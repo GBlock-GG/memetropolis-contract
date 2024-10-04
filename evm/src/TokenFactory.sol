@@ -2,6 +2,7 @@
 pragma solidity ^0.8.26;
 
 import "./Token.sol";
+import "./library/LogExpMath.sol";
 import "@uniswap-v2-core-1.0.1/contracts/interfaces/IUniswapV2Factory.sol";
 import "@uniswap-v2-core-1.0.1/contracts/interfaces/IUniswapV2Pair.sol";
 import "@uniswap-v2-periphery-1.1.0-beta.0/contracts/interfaces/IUniswapV2Router02.sol";
@@ -21,6 +22,7 @@ contract TokenFactory is ReentrancyGuard, Ownable {
         string description;
         string tokenImageUrl;
         uint fundingRaised;
+        bool isFundingFinished;
         address tokenAddress;
         address creatorAddress;
     }
@@ -31,8 +33,6 @@ contract TokenFactory is ReentrancyGuard, Ownable {
     /// @notice Maps meme token address to its associated details in `memeToken` struct.
     mapping(address => memeToken) public addressToMemeTokenMapping;
 
-    // uint constant MEMETOKEN_CREATION_PLATFORM_FEE = 0.0001 ether;
-    uint public immutable MEMECOIN_FUNDING_GOAL;
     uint public immutable TOKEN_CREATOR_BONUS;
     uint public immutable PLATFORM_FEE;
     address public immutable PLATFORM_TREASURY_ADDRESS;
@@ -60,17 +60,16 @@ contract TokenFactory is ReentrancyGuard, Ownable {
     error FailedToSendETH();
     error InsufficientBalance();
     error NotEnoughAvailableSupply();
+    error SlippageExceeded();
 
     constructor(
         address treasuryAddress,
-        uint256 fundingGoal,
         uint256 tokenCreatorBonus,
         uint256 platformFee,
         address initialOwner)
         Ownable(initialOwner)
     {
         PLATFORM_TREASURY_ADDRESS = treasuryAddress;
-        MEMECOIN_FUNDING_GOAL = fundingGoal;
         TOKEN_CREATOR_BONUS = tokenCreatorBonus;
         PLATFORM_FEE = platformFee;
     }
@@ -86,8 +85,8 @@ contract TokenFactory is ReentrancyGuard, Ownable {
         uint256 exponent2 = (K * currentSupply);
 
         // Calculate e^(kx) using the exp function
-        uint256 exp1 = exp(exponent1);
-        uint256 exp2 = exp(exponent2);
+        uint256 exp1 = LogExpMath.exp(exponent1);
+        uint256 exp2 = LogExpMath.exp(exponent2);
 
         // Cost formula: (P0 / k) * (e^(k * (currentSupply + tokensToBuy)) - e^(k * currentSupply))
         // We use (P0 * 10^18) / k to keep the division safe from zero
@@ -95,23 +94,24 @@ contract TokenFactory is ReentrancyGuard, Ownable {
         return cost;
     }
 
-    /// @notice Helper function to approximate e^x using a Taylor series expansion.
-    /// @param x The exponent value.
-    /// @return The approximated result of e^x.
-    function exp(uint256 x) internal pure returns (uint256) {
-        uint256 sum = 10**18;  // Start with 1 * 10^18 for precision
-        uint256 term = 10**18;  // Initial term = 1 * 10^18
-        uint256 xPower = x;  // Initial power of x
+    /// @notice Calculates the cost in wei for purchasing tokens using an exponential bonding curve.
+    /// @param currentSupply The current token supply.
+    /// @param ethAmount The ETH amount.
+    /// @return The tokens to purchase.
+    function calculateTokenAmount(uint256 currentSupply, uint256 ethAmount) public pure returns (uint256) {
         
-        for (uint256 i = 1; i <= 20; i++) {  // Increase iterations for better accuracy
-            term = (term * xPower) / (i * 10**18);  // x^i / i!
-            sum += term;
+        // Calculate e^(k * currentSupply)
+        uint256 exp = LogExpMath.exp(K * currentSupply);
 
-            // Prevent overflow and unnecessary calculations
-            if (term < 1) break;
-        }
+        // Calculate (ethAmount * K) / INIT_PRICE
+        uint256 num = (ethAmount * K) / INITIAL_PRICE;
 
-        return sum;
+        // Calculate ln((ethAmount * K) / INIT_PRICE + e^(k * currentSupply))
+        uint256 ln = LogExpMath.ln(num + exp);
+
+        // formula: (ln((ethAmount * K) / INIT_PRICE + e^(k * currentSupply)) / K) - currentSupply
+        uint256 tokenAmount = ln / K - currentSupply;  // Adjust for k scaling without dividing by zero
+        return tokenAmount;
     }
 
     /// @notice Creates a new Meme Token.
@@ -125,7 +125,7 @@ contract TokenFactory is ReentrancyGuard, Ownable {
         //should deploy the meme token, mint the initial supply to the token factory contract
         Token ct = new Token(name, symbol, MAX_SUPPLY, LZ_ENDPOINT_V2_ADDRESS, msg.sender);
         address memeTokenAddress = address(ct);
-        memeToken memory newlyCreatedToken = memeToken(name, symbol, description, imageUrl, 0, memeTokenAddress, msg.sender);
+        memeToken memory newlyCreatedToken = memeToken(name, symbol, description, imageUrl, 0, false, memeTokenAddress, msg.sender);
         memeTokenAddresses.push(memeTokenAddress);
         addressToMemeTokenMapping[memeTokenAddress] = newlyCreatedToken;
 
@@ -161,6 +161,37 @@ contract TokenFactory is ReentrancyGuard, Ownable {
         return requiredEth;
     }
 
+    /// @notice Calculates the required ETH for purchasing a certain quantity of meme tokens.
+    /// @param memeTokenAddress The address of the meme token contract.
+    /// @param ethAmount The ETH amount to purchase.
+    /// @return The token out amount.
+    function getTokenOutOnBuy(address memeTokenAddress, uint ethAmount) public view returns (uint) {
+        //check if memecoin is listed
+        require(addressToMemeTokenMapping[memeTokenAddress].tokenAddress!=address(0), "Token is not listed");
+
+        Token memeTokenCt = Token(memeTokenAddress);
+        uint currentSupplyScaled = (MAX_SUPPLY - memeTokenCt.balanceOf(address(this))) / DECIMALS;
+        uint tokenAmountToPurchase = calculateTokenAmount(currentSupplyScaled, ethAmount) * DECIMALS;
+
+        return tokenAmountToPurchase;
+    }
+
+    /// @notice Calculates the ETH to receive when sell certain quantity of meme tokens.
+    /// @param memeTokenAddress The address of the meme token contract.
+    /// @param tokenQty The token amount to sell.
+    /// @return The ETH in wei to receive for quantity of tokens sell.
+    function getEthAmountOnSell(address memeTokenAddress, uint tokenQty) public view returns (uint) {
+        //check if memecoin is listed
+        require(addressToMemeTokenMapping[memeTokenAddress].tokenAddress!=address(0), "Token is not listed");
+
+        Token memeTokenCt = Token(memeTokenAddress);
+        uint currentSupplyScaled = (MAX_SUPPLY - memeTokenCt.balanceOf(address(this))) / DECIMALS;
+        uint tokenQtyScaled = tokenQty / DECIMALS;
+        uint requiredEth = calculateCost(currentSupplyScaled - tokenQtyScaled, tokenQtyScaled);
+
+        return requiredEth;
+    }
+
     /// @notice Calculate current token price.
     /// @param memeTokenAddress The address of the meme token contract.
     /// @return The price in ETH with 18 decimals.
@@ -176,7 +207,7 @@ contract TokenFactory is ReentrancyGuard, Ownable {
         uint currentSupplyScaled = (MAX_SUPPLY - tokenBalance) / DECIMALS;
 
         uint256 exponent = K * currentSupplyScaled;
-        uint256 price = INITIAL_PRICE * exp(exponent) / DECIMALS;
+        uint256 price = INITIAL_PRICE * LogExpMath.exp(exponent) / DECIMALS;
 
         return price;
     }
@@ -184,8 +215,7 @@ contract TokenFactory is ReentrancyGuard, Ownable {
     /// @notice Allows users to buy meme tokens using ETH.
     /// @param memeTokenAddress The address of the meme token contract.
     /// @param tokenQty The token amount to buy.
-    /// @return The result of the purchase.
-    function buyMemeToken(address memeTokenAddress, uint tokenQty) external payable returns(uint) {
+    function buyMemeToken(address memeTokenAddress, uint tokenQty) external payable {
 
         //check if memecoin is listed
         if (addressToMemeTokenMapping[memeTokenAddress].tokenAddress == address(0))
@@ -197,7 +227,7 @@ contract TokenFactory is ReentrancyGuard, Ownable {
         Token memeTokenCt = Token(memeTokenAddress);
 
         // check to ensure funding goal is not met
-        if (memeTokenCt.balanceOf(address(this)) < INIT_SUPPLY)
+        if (listedToken.isFundingFinished)
             revert FundingAlreadyRaised();
 
         // check to ensure there is enough supply to facilitate the purchase
@@ -215,38 +245,62 @@ contract TokenFactory is ReentrancyGuard, Ownable {
         if (msg.value < requiredEth)
             revert IncorrectETHSent();
 
-        // Incerement the funding
-        listedToken.fundingRaised+= msg.value;
+        // Increment the funding
+        listedToken.fundingRaised += msg.value;
 
         if(available_qty <= tokenQty) {
-            // create liquidity pool
-            address pool = _createLiquidityPool(memeTokenAddress);
-        
-            // provide liquidity
-            uint tokenAmount = INIT_SUPPLY;
-            uint ethAmount = listedToken.fundingRaised - TOKEN_CREATOR_BONUS - PLATFORM_FEE;
-            uint liquidity = _provideLiquidity(memeTokenAddress, tokenAmount, ethAmount);
-        
-            // burn lp token
-            _burnLpTokens(pool, liquidity);
-
-            // transfer fee to token creator
-            (bool success, ) = payable(listedToken.creatorAddress).call{value: TOKEN_CREATOR_BONUS}("");
-            if (!success)
-                revert FailedToSendETH();
-
-            // transfer fee to platform
-            (bool success1, ) = payable(PLATFORM_TREASURY_ADDRESS).call{value: PLATFORM_FEE}("");
-            if (!success1)
-                revert FailedToSendETH();
+            // create liquidity pool and send fees
+            _onBondingCurveFinish(memeTokenAddress);
         }
 
         // mint the tokens
         memeTokenCt.transfer(msg.sender, tokenQty);
 
         emit BoughtMemeToken(memeTokenAddress, msg.sender, tokenQty);
+    }
 
-        return 1;
+    /// @notice Allows users to buy meme tokens using ETH.
+    /// @param memeTokenAddress The address of the meme token contract.
+    /// @param tokenQtyMin The minimum token amount to buy.
+    function buyMemeTokenInEth(address memeTokenAddress, uint tokenQtyMin) external payable {
+
+        //check if memecoin is listed
+        if (addressToMemeTokenMapping[memeTokenAddress].tokenAddress == address(0))
+            revert TokenNotListed();
+        
+        memeToken storage listedToken = addressToMemeTokenMapping[memeTokenAddress];
+
+
+        Token memeTokenCt = Token(memeTokenAddress);
+
+        // check to ensure funding goal is not met
+        if (listedToken.isFundingFinished)
+            revert FundingAlreadyRaised();
+
+        uint256 ethAmount = msg.value;
+        uint currentSupplyScaled = (MAX_SUPPLY - memeTokenCt.balanceOf(address(this))) / DECIMALS;
+        uint tokenAmountToPurchase = calculateTokenAmount(currentSupplyScaled, ethAmount) * DECIMALS;
+        if (tokenAmountToPurchase < tokenQtyMin)
+            revert SlippageExceeded();
+
+        // check to ensure there is enough supply to facilitate the purchase
+        uint available_qty = memeTokenCt.balanceOf(address(this)) - INIT_SUPPLY;
+
+        if (tokenAmountToPurchase > available_qty)
+            revert NotEnoughAvailableSupply();
+
+        // Increment the funding
+        listedToken.fundingRaised += msg.value;
+
+        if(available_qty <= tokenAmountToPurchase) {
+            // create liquidity pool and send fees
+            _onBondingCurveFinish(memeTokenAddress);
+        }
+
+        // mint the tokens
+        memeTokenCt.transfer(msg.sender, tokenAmountToPurchase);
+
+        emit BoughtMemeToken(memeTokenAddress, msg.sender, tokenAmountToPurchase);
     }
 
     /// @notice Allows users to sell meme tokens for ETH.
@@ -262,12 +316,16 @@ contract TokenFactory is ReentrancyGuard, Ownable {
         memeToken storage listedToken = addressToMemeTokenMapping[memeTokenAddress];
 
         // check to ensure funding goal is not met
-        if (memeTokenCt.balanceOf(address(this)) < INIT_SUPPLY)
+        if (listedToken.isFundingFinished)
             revert FundingAlreadyRaised();
 
         memeTokenCt.transferFrom(msg.sender, address(this), tokenQty);
 
-        uint ethAmount = tokenQty * INITIAL_PRICE / DECIMALS;
+        // ethAmount to send = P0 * (e^(k*c)- e^(k*(c-x))) / k
+        uint currentSupplyScaled = (MAX_SUPPLY - memeTokenCt.balanceOf(address(this))) / DECIMALS;
+        uint tokenQtyScaled = tokenQty / DECIMALS;
+        uint ethAmount = calculateCost(currentSupplyScaled - tokenQtyScaled, tokenQtyScaled);
+
         // decrease funding raised amount
         listedToken.fundingRaised -= ethAmount;
 
@@ -278,6 +336,35 @@ contract TokenFactory is ReentrancyGuard, Ownable {
         emit SoldMemeToken(memeTokenAddress, msg.sender, tokenQty);
 
         return ethAmount;
+    }
+
+    /// @notice Internal function to Add liquidity on Uniswap V2 and send fees.
+    /// @param memeTokenAddress The address of the meme token contract.
+    function _onBondingCurveFinish(address memeTokenAddress) internal {
+        memeToken storage listedToken = addressToMemeTokenMapping[memeTokenAddress];
+
+        // create liquidity pool
+        address pool = _createLiquidityPool(memeTokenAddress);
+    
+        // provide liquidity
+        uint tokenAmount = INIT_SUPPLY;
+        uint ethAmount = listedToken.fundingRaised - TOKEN_CREATOR_BONUS - PLATFORM_FEE;
+        uint liquidity = _provideLiquidity(memeTokenAddress, tokenAmount, ethAmount);
+    
+        // burn lp token
+        _burnLpTokens(pool, liquidity);
+
+        listedToken.isFundingFinished = true;
+
+        // transfer fee to token creator
+        (bool success, ) = payable(listedToken.creatorAddress).call{value: TOKEN_CREATOR_BONUS}("");
+        if (!success)
+            revert FailedToSendETH();
+
+        // transfer fee to platform
+        (bool success1, ) = payable(PLATFORM_TREASURY_ADDRESS).call{value: PLATFORM_FEE}("");
+        if (!success1)
+            revert FailedToSendETH();
     }
 
     /// @notice Internal function to create a liquidity pool on Uniswap V2 for the meme token.
@@ -307,11 +394,9 @@ contract TokenFactory is ReentrancyGuard, Ownable {
     /// @notice Internal function to burn the liquidity pool tokens.
     /// @param pool The address of the liquidity pool.
     /// @param liquidity The amount of liquidity to burn.
-    /// @return The result of the burning operation.
-    function _burnLpTokens(address pool, uint liquidity) internal returns(uint){
+    function _burnLpTokens(address pool, uint liquidity) internal {
         IUniswapV2Pair uniswapv2pairct = IUniswapV2Pair(pool);
         uniswapv2pairct.transfer(address(0), liquidity);
-        return 1;
     }
 
     /// @notice Allows the owner to withdraw ETH from the contract
