@@ -6,6 +6,8 @@ import "src/TokenFactory.sol";
 import "src/Token.sol";
 
 contract DeployTokenFactory is Script {
+    address constant LZ_ENDPOINT_V2_ADDRESS = 0x6EDCE65403992e310A62460808c4b910D972f10f; // 0x1a44076050125825900e736c501f859c50fE728c
+
     function run() external {
         // Start broadcasting the deployment transaction
         vm.startBroadcast();
@@ -17,7 +19,7 @@ contract DeployTokenFactory is Script {
             msg.sender,
             TOKEN_CREATOR_BONUS,
             PLATFORM_FEE,
-            msg.sender
+            LZ_ENDPOINT_V2_ADDRESS
         );
 
         // Stop broadcasting the transaction

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.26;
 
 import "@layerzerolabs/lz-evm-oapp-v2/contracts/oft/OFT.sol";
-import "@openzeppelin-contracts-5.0.2/access/Ownable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract Token is OFT {
     address public tokenFactoryAddress;
