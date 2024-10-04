@@ -56,137 +56,138 @@ contract TokenFactoryTest is TestHelperOz5 {
         address tokenAddress = bFactory.createMemeToken("Test", "TEST", "img://img.png", "hello there");
         console.log("Init token balance: ", Token(tokenAddress).balanceOf(address(bFactory)));
 
-        uint128 ethAmount = 10**9;
+        uint128 ethAmount = 10**15;
         (uint256 nativeFee, ) = aFactory.quoteBuyCrossChainMemetoken(2, tokenAddress, ethAmount);
         aFactory.buyCrosschainMemetoken{ value: nativeFee }(2, tokenAddress, ethAmount);
-        // verify packet to bCounter manually
+
+        // verify packet to bFactory manually
         verifyPackets(bEid, addressToBytes32(address(bFactory)));
 
         console.log("Current token balance", Token(tokenAddress).balanceOf(address(bFactory)));
     }
 
-    // function test_CreateToken() public {
-    //     address tokenAddress = factory.createMemeToken("Test", "TEST", "img://img.png", "hello there");
-    //     Token token = Token(tokenAddress);
+    function test_CreateToken() public {
+        address tokenAddress = factory.createMemeToken("Test", "TEST", "img://img.png", "hello there");
+        Token token = Token(tokenAddress);
 
-    //     assertEq(token.balanceOf(address(factory)), factory.MAX_SUPPLY());
-    // }
+        assertEq(token.balanceOf(address(factory)), factory.MAX_SUPPLY());
+    }
 
-    // function test_BuyMemeToken() public {
-    //     address tokenAddress = factory.createMemeToken("Test", "TEST", "img://img.png", "hello there");
-    //     Token token = Token(tokenAddress);
+    function test_BuyMemeToken() public {
+        address tokenAddress = factory.createMemeToken("Test", "TEST", "img://img.png", "hello there");
+        Token token = Token(tokenAddress);
         
-    //     // Buy 20K tokens initially
-    //     uint tokenQty = 20000 * 10 ** 18;
-    //     uint requiredEth = factory.getRequiredEth(tokenAddress, tokenQty);
+        // Buy 20K tokens initially
+        uint tokenQty = 20000 * 10 ** 18;
+        uint requiredEth = factory.getRequiredEth(tokenAddress, tokenQty);
         
-    //     factory.buyMemeToken{value: requiredEth}(tokenAddress, tokenQty);
-    //     assertEq(token.balanceOf(address(this)), tokenQty);
+        factory.buyMemeToken{value: requiredEth}(tokenAddress, tokenQty);
+        assertEq(token.balanceOf(address(this)), tokenQty);
 
-    //     // Buy 10K tokens more
-    //     uint tokenQty2 = 10000 * 10 ** 18;
-    //     requiredEth = factory.getRequiredEth(tokenAddress, tokenQty2);
-    //     uint payEth = requiredEth + DECIMALS;
+        // Buy 10K tokens more
+        uint tokenQty2 = 10000 * 10 ** 18;
+        requiredEth = factory.getRequiredEth(tokenAddress, tokenQty2);
+        uint payEth = requiredEth + DECIMALS;
         
-    //     uint originalEthBalance = address(this).balance;
-    //     factory.buyMemeToken{value: payEth}(tokenAddress, tokenQty2);
-    //     assertEq(originalEthBalance - address(this).balance, requiredEth);
-    //     assertEq(token.balanceOf(address(this)), (tokenQty + tokenQty2));
-    // }
+        uint originalEthBalance = address(this).balance;
+        factory.buyMemeToken{value: payEth}(tokenAddress, tokenQty2);
+        assertEq(originalEthBalance - address(this).balance, requiredEth);
+        assertEq(token.balanceOf(address(this)), (tokenQty + tokenQty2));
+    }
 
 
-    // function test_BuyMemeTokenInETH() public {
-    //     uint depositAmount = 10 ether;
-    //     vm.deal(address(this), depositAmount);
+    function test_BuyMemeTokenInETH() public {
+        uint depositAmount = 10 ether;
+        vm.deal(address(this), depositAmount);
         
-    //     address tokenAddress = factory.createMemeToken("Test", "TEST", "img://img.png", "hello there");
-    //     Token token = Token(tokenAddress);
+        address tokenAddress = factory.createMemeToken("Test", "TEST", "img://img.png", "hello there");
+        Token token = Token(tokenAddress);
         
-    //     // Buy token equivalent to 1 ETH
-    //     uint ethAmount = 1 ether;
-    //     uint estimatedTokenOut = factory.getTokenOutOnBuy(tokenAddress, ethAmount);
-    //     console.log("Estimated Token out amount: ", estimatedTokenOut);
+        // Buy token equivalent to 1 ETH
+        uint ethAmount = 1 ether;
+        uint estimatedTokenOut = factory.getTokenOutOnBuy(tokenAddress, ethAmount);
+        console.log("Estimated Token out amount: ", estimatedTokenOut);
         
-    //     factory.buyMemeTokenInEth{value: ethAmount}(tokenAddress, 0);
-    //     console.log("Real Token out amount: ", token.balanceOf(address(this)));
-    // }
+        factory.buyMemeTokenInEth{value: ethAmount}(tokenAddress, 0);
+        console.log("Real Token out amount: ", token.balanceOf(address(this)));
+    }
 
-    // function test_BuyAllMemeToken() public {
-    //     uint depositAmount = 30 ether;
-    //     vm.deal(address(this), depositAmount);
+    function test_BuyAllMemeToken() public {
+        uint depositAmount = 30 ether;
+        vm.deal(address(this), depositAmount);
 
-    //     address tokenAddress = factory.createMemeToken("Test", "TEST", "img://img.png", "hello there");
-    //     Token token = Token(tokenAddress);
+        address tokenAddress = factory.createMemeToken("Test", "TEST", "img://img.png", "hello there");
+        Token token = Token(tokenAddress);
         
-    //     // Buy 800K tokens
-    //     uint tokenQty = 800_000 * 10 ** 18;
-    //     uint requiredEth = factory.getRequiredEth(tokenAddress, tokenQty);
-    //     console.log("Buy All - Required ETH: ", requiredEth);
+        // Buy 800K tokens
+        uint tokenQty = 800_000 * 10 ** 18;
+        uint requiredEth = factory.getRequiredEth(tokenAddress, tokenQty);
+        console.log("Buy All - Required ETH: ", requiredEth);
         
-    //     factory.buyMemeToken{value: requiredEth}(tokenAddress, tokenQty);
-    //     assertEq(token.balanceOf(address(this)), tokenQty);
+        factory.buyMemeToken{value: requiredEth}(tokenAddress, tokenQty);
+        assertEq(token.balanceOf(address(this)), tokenQty);
 
-    //     // check current price
-    //     uint tokenPrice = factory.getCurrentTokenPrice(tokenAddress);
-    //     uint marketCap = tokenPrice * token.totalSupply() / DECIMALS;
-    //     console.log("Buy All - Marketcap: ", marketCap);
-    // }
+        // check current price
+        uint tokenPrice = factory.getCurrentTokenPrice(tokenAddress);
+        uint marketCap = tokenPrice * token.totalSupply() / DECIMALS;
+        console.log("Buy All - Marketcap: ", marketCap);
+    }
 
-    // function test_SellMemeToken() public {
-    //     address tokenAddress = factory.createMemeToken("Test", "TEST", "img://img.png", "hello there");
-    //     Token token = Token(tokenAddress);
+    function test_SellMemeToken() public {
+        address tokenAddress = factory.createMemeToken("Test", "TEST", "img://img.png", "hello there");
+        Token token = Token(tokenAddress);
         
-    //     // Buy 20K tokens
-    //     uint tokenQty = 20000 * 10 ** 18;
-    //     uint requiredEth = factory.getRequiredEth(tokenAddress, tokenQty);
+        // Buy 20K tokens
+        uint tokenQty = 20000 * 10 ** 18;
+        uint requiredEth = factory.getRequiredEth(tokenAddress, tokenQty);
         
-    //     factory.buyMemeToken{value: requiredEth}(tokenAddress, tokenQty);
-    //     assertEq(token.balanceOf(address(this)), tokenQty);
+        factory.buyMemeToken{value: requiredEth}(tokenAddress, tokenQty);
+        assertEq(token.balanceOf(address(this)), tokenQty);
 
-    //     // Sell 10K tokens
-    //     uint sellTokenQty = 10000 * 10 ** 18;
-    //     token.approve(address(factory), sellTokenQty);
+        // Sell 10K tokens
+        uint sellTokenQty = 10000 * 10 ** 18;
+        token.approve(address(factory), sellTokenQty);
         
-    //     uint prevEthBalance = address(this).balance;
-    //     factory.sellMemeToken(tokenAddress, sellTokenQty);
-    //     uint increasedEthBalance = address(this).balance - prevEthBalance;
-    //     console.log("Increased ETH balance: ", increasedEthBalance);
-    // }
+        uint prevEthBalance = address(this).balance;
+        factory.sellMemeToken(tokenAddress, sellTokenQty);
+        uint increasedEthBalance = address(this).balance - prevEthBalance;
+        console.log("Increased ETH balance: ", increasedEthBalance);
+    }
 
-    // function test_CreateLiquidityPool() public {
-    //     uint depositAmount = 10 ether;
-    //     vm.deal(address(this), depositAmount);
+    function test_CreateLiquidityPool() public {
+        uint depositAmount = 10 ether;
+        vm.deal(address(this), depositAmount);
 
-    //     address tokenAddress = factory.createMemeToken("Test", "TEST", "img://img.png", "hello there");
-    //     Token token = Token(tokenAddress);
+        address tokenAddress = factory.createMemeToken("Test", "TEST", "img://img.png", "hello there");
+        Token token = Token(tokenAddress);
         
-    //     // Buy 20K tokens initially
-    //     uint tokenQty = 80000 * 10 ** 18;
-    //     uint requiredEth = factory.getRequiredEth(tokenAddress, tokenQty);
+        // Buy 20K tokens initially
+        uint tokenQty = 80000 * 10 ** 18;
+        uint requiredEth = factory.getRequiredEth(tokenAddress, tokenQty);
         
-    //     factory.buyMemeToken{value: requiredEth}(tokenAddress, tokenQty);
-    //     assertEq(token.balanceOf(address(this)), tokenQty);
-    // }
+        factory.buyMemeToken{value: requiredEth}(tokenAddress, tokenQty);
+        assertEq(token.balanceOf(address(this)), tokenQty);
+    }
 
-    // function testWithdrawETH() public {
-    //     // Setup initial conditions
-    //     uint depositAmount = 1 ether;
-    //     vm.deal(address(this), depositAmount);
-    //     (bool success, ) = payable(address(factory)).call{value: depositAmount}("");
-    //     require(success, "Failed to send Ether");
+    function testWithdrawETH() public {
+        // Setup initial conditions
+        uint depositAmount = 1 ether;
+        vm.deal(address(this), depositAmount);
+        (bool success, ) = payable(address(factory)).call{value: depositAmount}("");
+        require(success, "Failed to send Ether");
 
-    //     uint withdrawalAmount = 1 ether;
-    //     factory.withdrawETH(withdrawalAmount);
-    //     assertEq(address(this).balance, withdrawalAmount, "Withdraw ETH failed");
-    // }
+        uint withdrawalAmount = 1 ether;
+        factory.withdrawETH(withdrawalAmount);
+        assertEq(address(this).balance, withdrawalAmount, "Withdraw ETH failed");
+    }
     
-    // function testWithdrawToken() public {
-    //     // Setup initial conditions
-    //     uint initialMintValue = 2000 * 10 ** 18;
-    //     SimpleToken newToken = new SimpleToken("A", "A", initialMintValue);
-    //     newToken.transfer(address(factory), initialMintValue);
+    function testWithdrawToken() public {
+        // Setup initial conditions
+        uint initialMintValue = 2000 * 10 ** 18;
+        SimpleToken newToken = new SimpleToken("A", "A", initialMintValue);
+        newToken.transfer(address(factory), initialMintValue);
 
-    //     factory.withdrawTokens(address(newToken), initialMintValue);
-    //     assertEq(newToken.balanceOf(address(this)), initialMintValue, "Withdraw Token failed");
-    // }
+        factory.withdrawTokens(address(newToken), initialMintValue);
+        assertEq(newToken.balanceOf(address(this)), initialMintValue, "Withdraw Token failed");
+    }
 }

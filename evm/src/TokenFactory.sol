@@ -58,6 +58,9 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
 
     uint256 public constant INITIAL_PRICE = 2 * 10 ** 12;  // Initial price in wei (P0), 2 * 10^12
     uint256 public constant K = 5 * 10 ** 12;  // Growth rate (k), scaled to avoid precision loss (5 * 10^12)
+
+    uint8 internal constant BUY_TYPE = 1;
+    uint8 internal constant SELL_TYPE = 2;
     
     event CreatedMemeToken(address indexed tokenAddress, address indexed creator, string name, string symbol);
     event BoughtMemeToken(address indexed memeTokenAddress, address indexed user, uint tokenQty);
@@ -78,7 +81,7 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
     /// @param memeTokenAddress The address of the meme token contract.
     /// @param ethAmount The Eth amount.
     function buyCrosschainMemetoken(uint32 _dstEid, address memeTokenAddress, uint128 ethAmount) external payable {
-        bytes memory message = abi.encode(memeTokenAddress, msg.sender, ethAmount);
+        bytes memory message = abi.encode(BUY_TYPE, memeTokenAddress, msg.sender, ethAmount, 0);
         bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(200000, ethAmount);
         _lzSend(
             _dstEid,
@@ -95,30 +98,62 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
         address memeTokenAddress,
         uint128 ethAmount
     ) public view returns (uint256 nativeFee, uint256 lzTokenFee) {
-        bytes memory message = abi.encode(memeTokenAddress, msg.sender, ethAmount);
+        bytes memory message = abi.encode(BUY_TYPE, memeTokenAddress, msg.sender, ethAmount, 0);
         bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(200000, ethAmount);
         
         MessagingFee memory fee = _quote(_dstEid, message, options, false);
         return (fee.nativeFee, fee.lzTokenFee);
     }
 
+    /// @notice Allows users to buy meme tokens using ETH.
+    /// @param memeTokenAddress The address of the meme token contract.
+    /// @param tokenQty The Token amount to sell.
+    function sellCrosschainMemetoken(uint32 _dstEid, address memeTokenAddress, uint256 tokenQty) external payable {
+        bytes memory message = abi.encode(SELL_TYPE, memeTokenAddress, msg.sender, 0, tokenQty);
+        bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(200000, 0);
+        _lzSend(
+            _dstEid,
+            message,
+            options,
+            MessagingFee(msg.value, 0),
+            payable(msg.sender)
+        );
+    }
+
+    /// @notice Use this function to estimate fees for your cross-chain buyCrosschainMemetoken()
+    function quoteSellCrossChainMemetoken(
+        uint32 _dstEid,
+        address memeTokenAddress,
+        uint256 tokenQty
+    ) public view returns (uint256 nativeFee, uint256 lzTokenFee) {
+        bytes memory message = abi.encode(SELL_TYPE, memeTokenAddress, msg.sender, 0, tokenQty);
+        bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(200000, 0);
+        
+        MessagingFee memory fee = _quote(_dstEid, message, options, false);
+        return (fee.nativeFee, fee.lzTokenFee);
+    }
+
     function _lzReceive(
-        Origin calldata _origin,
-        bytes32 _guid,
+        Origin calldata,
+        bytes32,
         bytes calldata payload,
         address,  // Executor address as specified by the OApp.
         bytes calldata  // Any extra data or options to trigger on receipt.
     ) internal override {
         // Decode the payload to get the message
-        (address memeTokenAddress, address _to, uint256 ethAmount) = abi.decode(payload, (address, address, uint256));
+        (uint8 msgType, address memeTokenAddress, address _to, uint256 ethAmount, uint256 tokenQty) = abi.decode(payload, (uint8, address, address, uint256, uint256));
         console.log("lzReceive msg.value: ", msg.value);
         console.log("lzReceive memeTokenAddress: ", memeTokenAddress);
         console.log("lzReceive ethAmount: ", ethAmount);
-        if (msg.value < ethAmount)
-            revert IncorrectETHSent();
+        
+        if (msgType == BUY_TYPE) {
+            if (msg.value < ethAmount)
+                revert IncorrectETHSent();
 
-        // _origin.sender byte32 to address
-        _buyMemeTokenInEth(memeTokenAddress, ethAmount, _to, 0);
+            _buyMemeTokenInEth(memeTokenAddress, ethAmount, _to, 0);
+        } else if (msgType == SELL_TYPE) {
+            _sellMemeToken(memeTokenAddress, _to, tokenQty);
+        }
     }
 
     constructor(
@@ -391,6 +426,14 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
     /// @param tokenQty The number of tokens to sell.
     /// @return The amount of ETH received in return.
     function sellMemeToken(address memeTokenAddress, uint tokenQty) external nonReentrant returns(uint) {
+        return _sellMemeToken(memeTokenAddress, msg.sender, tokenQty);
+    }
+
+    /// @notice Internal function which allows users to sell meme tokens for ETH.
+    /// @param memeTokenAddress The address of the meme token contract.
+    /// @param tokenQty The number of tokens to sell.
+    /// @return The amount of ETH received in return.
+    function _sellMemeToken(address memeTokenAddress, address from, uint tokenQty) internal returns(uint) {
         //check if memecoin is listed
         if (addressToMemeTokenMapping[memeTokenAddress].tokenAddress == address(0))
             revert TokenNotListed();
@@ -402,7 +445,7 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
         if (listedToken.isFundingFinished)
             revert FundingAlreadyRaised();
 
-        memeTokenCt.transferFrom(msg.sender, address(this), tokenQty);
+        memeTokenCt.transferFrom(from, address(this), tokenQty);
 
         // ethAmount to send = P0 * (e^(k*c)- e^(k*(c-x))) / k
         uint currentSupplyScaled = (MAX_SUPPLY - memeTokenCt.balanceOf(address(this))) / DECIMALS;
@@ -412,11 +455,11 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
         // decrease funding raised amount
         listedToken.fundingRaised -= ethAmount;
 
-        (bool success, ) = payable(msg.sender).call{value: ethAmount}("");
+        (bool success, ) = payable(from).call{value: ethAmount}("");
         if (!success)
             revert FailedToSendETH();
 
-        emit SoldMemeToken(memeTokenAddress, msg.sender, tokenQty);
+        emit SoldMemeToken(memeTokenAddress, from, tokenQty);
 
         return ethAmount;
     }
