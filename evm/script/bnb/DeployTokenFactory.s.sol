@@ -14,12 +14,14 @@ contract DeployTokenFactory is Script {
 
         uint TOKEN_CREATOR_BONUS = 0.12 ether;
         uint PLATFORM_FEE = 0.6 ether;
+        uint INITIAL_PRICE = 2 * 10 ** 12;
 
         TokenFactory factory = new TokenFactory(
             msg.sender,
             TOKEN_CREATOR_BONUS,
             PLATFORM_FEE,
-            LZ_ENDPOINT_V2_ADDRESS
+            LZ_ENDPOINT_V2_ADDRESS,
+            INITIAL_PRICE
         );
 
         // Stop broadcasting the transaction

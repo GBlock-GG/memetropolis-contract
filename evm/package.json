@@ -5,7 +5,8 @@
     "build": "forge build",
     "test": "forge test",
     "deploy": "make deploy-local",
-    "deploy:bnbTestnet": "make deploy-bnbTestnet"
+    "deploy:bnbTestnet": "make deploy-bnbTestnet",
+    "deploy:baseTestnet": "make deploy-baseTestnet"
   },
   "dependencies": {
     "@layerzerolabs/lz-evm-messagelib-v2": "^3.0.1",

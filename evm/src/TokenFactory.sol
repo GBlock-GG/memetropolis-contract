@@ -18,7 +18,6 @@ import {
 } from "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ILayerZeroEndpointV2.sol";
 import { OApp } from "@layerzerolabs/lz-evm-oapp-v2/contracts/oapp/OApp.sol";
 import { OptionsBuilder } from "@layerzerolabs/lz-evm-oapp-v2/contracts/oapp/libs/OptionsBuilder.sol";
-import {console} from "forge-std/console.sol";
 
 /// @title Meme Token Factory
 /// @notice This contract allows users to create and manage Meme tokens, which can be traded and sold on Uniswap.
@@ -50,13 +49,12 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
 
     address constant UNISWAP_V2_FACTORY_ADDRESS = 0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6;
     address constant UNISWAP_V2_ROUTER_ADDRESS = 0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24;
-    address constant LZ_ENDPOINT_V2_ADDRESS = 0x6EDCE65403992e310A62460808c4b910D972f10f; // 0x1a44076050125825900e736c501f859c50fE728c
-
+    
     uint constant DECIMALS = 10 ** 18;
     uint public constant MAX_SUPPLY = 1000000 * DECIMALS;
     uint public constant INIT_SUPPLY = 20 * MAX_SUPPLY / 100;
 
-    uint256 public constant INITIAL_PRICE = 2 * 10 ** 12;  // Initial price in wei (P0), 2 * 10^12
+    uint256 public immutable INITIAL_PRICE;  // Initial price in wei (P0), 2 * 10^12
     uint256 public constant K = 5 * 10 ** 12;  // Growth rate (k), scaled to avoid precision loss (5 * 10^12)
 
     uint8 internal constant BUY_TYPE = 1;
@@ -76,6 +74,22 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
     error NotEnoughAvailableSupply();
     error SlippageExceeded();
     error ArrayLengthsMustMatch();
+
+    constructor(
+        address treasuryAddress,
+        uint256 tokenCreatorBonus,
+        uint256 platformFee,
+        address _lzEndpoint,
+        uint256 initialPrice
+    )
+        Ownable(msg.sender)
+        OApp(_lzEndpoint, msg.sender)
+    {
+        PLATFORM_TREASURY_ADDRESS = treasuryAddress;
+        TOKEN_CREATOR_BONUS = tokenCreatorBonus;
+        PLATFORM_FEE = platformFee;
+        INITIAL_PRICE = initialPrice;
+    }
 
     /// @notice Allows users to buy meme tokens using ETH.
     /// @param memeTokenAddress The address of the meme token contract.
@@ -100,7 +114,6 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
     ) public view returns (uint256 nativeFee, uint256 lzTokenFee) {
         bytes memory message = abi.encode(BUY_TYPE, memeTokenAddress, msg.sender, ethAmount, 0);
         bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(200000, ethAmount);
-        
         MessagingFee memory fee = _quote(_dstEid, message, options, false);
         return (fee.nativeFee, fee.lzTokenFee);
     }
@@ -142,10 +155,7 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
     ) internal override {
         // Decode the payload to get the message
         (uint8 msgType, address memeTokenAddress, address _to, uint256 ethAmount, uint256 tokenQty) = abi.decode(payload, (uint8, address, address, uint256, uint256));
-        console.log("lzReceive msg.value: ", msg.value);
-        console.log("lzReceive memeTokenAddress: ", memeTokenAddress);
-        console.log("lzReceive ethAmount: ", ethAmount);
-        
+
         if (msgType == BUY_TYPE) {
             if (msg.value < ethAmount)
                 revert IncorrectETHSent();
@@ -156,25 +166,11 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
         }
     }
 
-    constructor(
-        address treasuryAddress,
-        uint256 tokenCreatorBonus,
-        uint256 platformFee,
-        address _lzEndpoint
-    )
-        Ownable(msg.sender)
-        OApp(_lzEndpoint, msg.sender)
-    {
-        PLATFORM_TREASURY_ADDRESS = treasuryAddress;
-        TOKEN_CREATOR_BONUS = tokenCreatorBonus;
-        PLATFORM_FEE = platformFee;
-    }
-
     /// @notice Calculates the cost in wei for purchasing tokens using an exponential bonding curve.
     /// @param currentSupply The current token supply.
     /// @param tokensToBuy The number of tokens the user wants to buy.
     /// @return The total cost in wei required to purchase the tokens.
-    function calculateCost(uint256 currentSupply, uint256 tokensToBuy) public pure returns (uint256) {
+    function calculateCost(uint256 currentSupply, uint256 tokensToBuy) public view returns (uint256) {
         
         // Calculate the exponent parts scaled to avoid precision loss
         uint256 exponent1 = (K * (currentSupply + tokensToBuy));
@@ -194,23 +190,19 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
     /// @param currentSupply The current token supply.
     /// @param ethAmount The ETH amount.
     /// @return The tokens to purchase.
-    function calculateTokenAmount(uint256 currentSupply, uint256 ethAmount) public pure returns (uint256) {
+    function calculateTokenAmount(uint256 currentSupply, uint256 ethAmount) public view returns (uint256) {
         
         // Calculate e^(k * currentSupply)
         uint256 exp = LogExpMath.exp(K * currentSupply);
-        console.log("exp: ", exp);
 
         // Calculate (ethAmount * K) / INIT_PRICE
         uint256 num = (ethAmount * K) / INITIAL_PRICE;
-        console.log("num: ", num);
 
         // Calculate ln((ethAmount * K) / INIT_PRICE + e^(k * currentSupply))
         uint256 ln = LogExpMath.ln(num + exp);
-        console.log("ln: ", ln);
 
         // formula: (ln((ethAmount * K) / INIT_PRICE + e^(k * currentSupply)) / K) - currentSupply
         uint256 tokenAmount = ln / K - currentSupply;  // Adjust for k scaling without dividing by zero
-        console.log("tokenAmount: ", tokenAmount);
         return tokenAmount;
     }
 
@@ -386,7 +378,6 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
         
         memeToken storage listedToken = addressToMemeTokenMapping[memeTokenAddress];
 
-
         Token memeTokenCt = Token(memeTokenAddress);
 
         // check to ensure funding goal is not met
@@ -394,16 +385,13 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
             revert FundingAlreadyRaised();
 
         uint currentSupplyScaled = (MAX_SUPPLY - memeTokenCt.balanceOf(address(this))) / DECIMALS;
-        console.log("lzReceive currentSupplyScaled: ", currentSupplyScaled);
         uint tokenAmountToPurchase = calculateTokenAmount(currentSupplyScaled, ethAmount) * DECIMALS;
-        console.log("lzReceive tokenAmountToPurchase: ", tokenAmountToPurchase);
         if (tokenAmountToPurchase < tokenQtyMin)
             revert SlippageExceeded();
 
         // check to ensure there is enough supply to facilitate the purchase
         uint available_qty = memeTokenCt.balanceOf(address(this)) - INIT_SUPPLY;
-        console.log("lzReceive available_qty: ", available_qty);
-
+        
         if (tokenAmountToPurchase > available_qty)
             revert NotEnoughAvailableSupply();
 
@@ -415,7 +403,7 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
             _onBondingCurveFinish(memeTokenAddress);
         }
 
-        // mint the tokens
+        // transfer tokens
         memeTokenCt.transfer(_to, tokenAmountToPurchase);
 
         emit BoughtMemeToken(memeTokenAddress, _to, tokenAmountToPurchase);
