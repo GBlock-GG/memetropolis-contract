@@ -1,47 +1,10 @@
-use anchor_lang::prelude::*;
+use crate::*;
 use anchor_spl::{
     associated_token::AssociatedToken,
     token::Token,
     token_interface::{Mint, TokenAccount},
 };
 
-use crate::states::*;
-use crate::utils::*;
-
-pub fn sell(
-    ctx: Context<Sell>,
-    amount: u64,         //sell token Amount
-    min_sol_output: u64, // max Sol amount for slippage
-) -> Result<()> {
-    let decimals = (10 as u64).pow(ctx.accounts.token_mint.decimals as u32);
-
-    // transfer token from user to vault
-    transfer_token_from_user_to_vault(
-        ctx.accounts.user.to_account_info(), //authority
-        ctx.accounts.associted_user_token_account.to_account_info(), // sender user's token account
-        ctx.accounts.associted_bonding_curve.to_account_info(),
-        ctx.accounts.token_mint.to_account_info(),
-        ctx.accounts.token_program.to_account_info(),
-        amount,
-        ctx.accounts.token_mint.decimals,
-    )?;
-    let sol_amount = amount * INITIAL_PRICE / decimals;
-    assert!(sol_amount >= min_sol_output, "Incorrect value of SOL sent");
-
-    //transfer sol from vault to user
-    transfer_sol_from_vault_to_user(
-        ctx.accounts.bonding_curve.to_account_info(),
-        ctx.accounts.user.to_account_info(),
-        sol_amount,
-    )?;
-    emit!(SellEvent {
-        mint: ctx.accounts.token_mint.key(),
-        token_input: amount,
-        sol_output: sol_amount,
-        seller: ctx.accounts.user.key()
-    });
-    Ok(())
-}
 
 #[derive(Accounts)]
 pub struct Sell<'info> {
@@ -83,3 +46,40 @@ pub struct Sell<'info> {
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
 }
+impl Sell<'_> {
+  pub fn apply(
+    ctx: &mut Context<Sell>,
+    amount: u64,         //sell token Amount
+    min_sol_output: u64, // max Sol amount for slippage
+  ) -> Result<()> {
+    let decimals = (10 as u64).pow(ctx.accounts.token_mint.decimals as u32);
+
+    // transfer token from user to vault
+    transfer_token_from_user_to_vault(
+        ctx.accounts.user.to_account_info(), //authority
+        ctx.accounts.associted_user_token_account.to_account_info(), // sender user's token account
+        ctx.accounts.associted_bonding_curve.to_account_info(),
+        ctx.accounts.token_mint.to_account_info(),
+        ctx.accounts.token_program.to_account_info(),
+        amount,
+        ctx.accounts.token_mint.decimals,
+    )?;
+    let sol_amount = amount * INITIAL_PRICE / decimals;
+    require!(sol_amount >= min_sol_output, PumpFunError::InvalidSolAmount);
+
+    //transfer sol from vault to user
+    transfer_sol_from_vault_to_user(
+        ctx.accounts.bonding_curve.to_account_info(),
+        ctx.accounts.user.to_account_info(),
+        sol_amount,
+    )?;
+    emit!(SellEvent {
+        mint: ctx.accounts.token_mint.key(),
+        token_input: amount,
+        sol_output: sol_amount,
+        seller: ctx.accounts.user.key()
+    });
+    Ok(())
+  }
+}
+

@@ -1,37 +1,94 @@
-use anchor_lang::prelude::*;
+use crate::*;
+
 use anchor_spl::{
     associated_token::AssociatedToken,
     token::Token,
     token_interface::{Mint, TokenAccount},
 };
 
-use crate::states::*;
-use crate::utils::*;
+#[derive(Accounts)]
+pub struct Buy<'info> {
+  #[account(
+    mut,
+    mint::authority = mint_authority,
+    mint::token_program = token_program,
+  )]
+  pub token_mint: Box<InterfaceAccount<'info, Mint>>,
 
-pub fn buy(
-    ctx: Context<Buy>,
-    amount: u64,       //buy Amount
-    max_sol_cost: u64, // max Sol amount for slippage
-) -> Result<()> {
+    /// CHECKED
+  #[account(
+    seeds = [
+      TOKEN_MINT_AUTHORITY_SEED.as_bytes(),
+      config.key().as_ref()
+    ],
+    bump
+  )]
+  pub mint_authority: UncheckedAccount<'info>,
+
+  #[account(
+    seeds = [
+      CONFIG_SEED.as_bytes(),
+      config.authority.as_ref(),
+    ],
+    bump
+  )]
+  pub config: Box<Account<'info, Config>>,
+
+    /// CHECK
+  #[account(
+    mut,
+    seeds = [
+      BONDING_CURVE_SEED.as_bytes(),
+      token_mint.key().as_ref()
+    ],
+    bump,
+  )]
+  pub bonding_curve: UncheckedAccount<'info>,
+
+  #[account(
+    mut,
+    associated_token::mint = token_mint,
+    associated_token::authority = bonding_curve,
+    token::token_program = token_program,
+  )]
+  pub associted_bonding_curve: Box<InterfaceAccount<'info, TokenAccount>>,
+
+  #[account(
+    mut,
+    associated_token::mint = token_mint,
+    associated_token::authority = user,
+    token::token_program = token_program,
+  )]
+  pub associted_user_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
+
+  #[account(mut)]
+    pub user: Signer<'info>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
+}
+
+impl Buy<'_> {
+  pub fn apply(ctx: &mut Context<Buy>, amount: u64, max_sol_cost: u64) -> Result<()> {
     let decimals = ctx.accounts.token_mint.decimals;
 
     // check to ensure funding goal is not met
-    assert!(
+    require!(
         ctx.accounts.associted_bonding_curve.amount > ctx.accounts.config.init_supply,
-        "Funding Already Raised"
+        PumpFunError::AlreadyRaised
     );
 
     let available_qty =
         ctx.accounts.associted_bonding_curve.amount - ctx.accounts.config.init_supply;
-    assert!(amount < available_qty, "Not enough available supply");
+    require!(amount < available_qty, PumpFunError::NotEnoughSuppply);
 
     let current_supply =
         ctx.accounts.config.max_supply - ctx.accounts.associted_bonding_curve.amount;
     let required_lamports = calculate_cost(current_supply, amount, decimals);
 
-    assert!(
+    require!(
         max_sol_cost >= required_lamports,
-        "Incorrect value of SOL sent"
+        PumpFunError::InvalidSolAmount
     );
 
     //transfer sol to vault
@@ -68,66 +125,5 @@ pub fn buy(
         buyer: ctx.accounts.user.key()
     });
     Ok(())
-}
-
-#[derive(Accounts)]
-pub struct Buy<'info> {
-    #[account(
-    mut,
-    mint::authority = mint_authority,
-    mint::token_program = token_program,
-  )]
-    pub token_mint: Box<InterfaceAccount<'info, Mint>>,
-
-    /// CHECKED
-    #[account(
-    seeds = [
-      TOKEN_MINT_AUTHORITY_SEED.as_bytes(),
-      config.key().as_ref()
-    ],
-    bump
-  )]
-    pub mint_authority: UncheckedAccount<'info>,
-
-    #[account(
-    seeds = [
-      CONFIG_SEED.as_bytes(),
-      config.authority.as_ref(),
-    ],
-    bump
-  )]
-    pub config: Box<Account<'info, Config>>,
-
-    /// CHECK
-    #[account(
-    mut,
-    seeds = [
-      BONDING_CURVE_SEED.as_bytes(),
-      token_mint.key().as_ref()
-    ],
-    bump,
-  )]
-    pub bonding_curve: UncheckedAccount<'info>,
-
-    #[account(
-    mut,
-    associated_token::mint = token_mint,
-    associated_token::authority = bonding_curve,
-    token::token_program = token_program,
-  )]
-    pub associted_bonding_curve: Box<InterfaceAccount<'info, TokenAccount>>,
-
-    #[account(
-    mut,
-    associated_token::mint = token_mint,
-    associated_token::authority = user,
-    token::token_program = token_program,
-  )]
-    pub associted_user_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
-
-    #[account(mut)]
-    pub user: Signer<'info>,
-    pub associated_token_program: Program<'info, AssociatedToken>,
-    pub token_program: Program<'info, Token>,
-    pub system_program: Program<'info, System>,
+  }
 }

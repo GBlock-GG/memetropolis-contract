@@ -1,4 +1,4 @@
-use anchor_lang::prelude::*;
+use crate::*;
 
 pub const CONFIG_SEED: &str = "pumpfun_config";
 pub const TOKEN_SEED: &str = "pumpfun_token";

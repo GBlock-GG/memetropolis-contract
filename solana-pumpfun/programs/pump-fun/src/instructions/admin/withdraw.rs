@@ -1,12 +1,9 @@
-use anchor_lang::prelude::*;
+use crate::*;
 use anchor_spl::{
     associated_token::AssociatedToken,
     token::Token,
     token_interface::{Mint, TokenAccount},
 };
-
-use crate::states::*;
-use crate::utils::*;
 
 #[derive(Accounts)]
 pub struct Withdraw<'info> {
@@ -54,18 +51,16 @@ pub struct Withdraw<'info> {
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
 }
+impl Withdraw<'_> {
+  pub fn apply(ctx: &mut Context<Withdraw>) -> Result<()> {
 
-//transfer sol and token to admin account
-pub fn withdraw(ctx: Context<Withdraw>) -> Result<()> {
-  let sol_amount = ctx.accounts.bonding_curve.to_account_info().lamports();
-    //check sol_amount
-    // assert!(
-    //     sol_amount >= WITHDRAWABLE_MIN_SOL_AMOUNT,
-    //     "Insufficient amount to withdraw"
-    // );
-    
-    
-    
+    let sol_amount = ctx.accounts.bonding_curve.to_account_info().lamports();
+      //check sol_amount
+      // assert!(
+      //     sol_amount >= WITHDRAWABLE_MIN_SOL_AMOUNT,
+      //     "Insufficient amount to withdraw"
+      // );
+
     let token_amount = ctx.accounts.associted_bonding_curve.amount;
     //transfer token from vault to user
     let token_mint = ctx.accounts.token_mint.key();
@@ -86,14 +81,13 @@ pub fn withdraw(ctx: Context<Withdraw>) -> Result<()> {
         decimals,
         vault_signer_seeds,
     )?;
-    
+
     //transfer sol from vault to user
     transfer_sol_from_vault_to_user(
-      ctx.accounts.bonding_curve.to_account_info(),
-      ctx.accounts.authority.to_account_info(),
-      sol_amount,
+        ctx.accounts.bonding_curve.to_account_info(),
+        ctx.accounts.authority.to_account_info(),
+        sol_amount,
     )?;
-
 
     emit!(WithdrawEvent {
         mint: ctx.accounts.token_mint.key(),
@@ -103,4 +97,6 @@ pub fn withdraw(ctx: Context<Withdraw>) -> Result<()> {
     });
 
     Ok(())
+  }
 }
+
