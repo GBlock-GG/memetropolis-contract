@@ -201,26 +201,4 @@ contract TokenFactoryTest is TestHelperOz5 {
         factory.buyMemeToken{value: requiredEth}(tokenAddress, tokenQty);
         assertEq(token.balanceOf(address(this)), tokenQty);
     }
-
-    function testWithdrawETH() public {
-        // Setup initial conditions
-        uint depositAmount = 1 ether;
-        vm.deal(address(this), depositAmount);
-        (bool success, ) = payable(address(factory)).call{value: depositAmount}("");
-        require(success, "Failed to send Ether");
-
-        uint withdrawalAmount = 1 ether;
-        factory.withdrawETH(withdrawalAmount);
-        assertEq(address(this).balance, withdrawalAmount, "Withdraw ETH failed");
-    }
-    
-    function testWithdrawToken() public {
-        // Setup initial conditions
-        uint initialMintValue = 2000 * 10 ** 18;
-        SimpleToken newToken = new SimpleToken("A", "A", initialMintValue);
-        newToken.transfer(address(factory), initialMintValue);
-
-        factory.withdrawTokens(address(newToken), initialMintValue);
-        assertEq(newToken.balanceOf(address(this)), initialMintValue, "Withdraw Token failed");
-    }
 }
