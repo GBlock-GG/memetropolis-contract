@@ -8,22 +8,14 @@ use anchor_spl::{
 
 #[derive(Accounts)]
 pub struct Buy<'info> {
-  #[account(
-    mut,
-    mint::authority = mint_authority,
-    mint::token_program = token_program,
-  )]
+  #[account(address = oft_config.token_mint)]
   pub token_mint: Box<InterfaceAccount<'info, Mint>>,
 
-    /// CHECKED
   #[account(
-    seeds = [
-      TOKEN_MINT_AUTHORITY_SEED.as_bytes(),
-      config.key().as_ref()
-    ],
-    bump
+    seeds = [OFT_SEED, &get_oft_config_seed(&oft_config).to_bytes()],
+    bump = oft_config.bump
   )]
-  pub mint_authority: UncheckedAccount<'info>,
+  pub oft_config: Account<'info, OftConfig>,
 
   #[account(
     seeds = [
@@ -74,16 +66,16 @@ impl Buy<'_> {
 
     // check to ensure funding goal is not met
     require!(
-        ctx.accounts.associted_bonding_curve.amount > ctx.accounts.config.init_supply,
+        ctx.accounts.associted_bonding_curve.amount > INIT_SUPPLY,
         PumpFunError::AlreadyRaised
     );
 
     let available_qty =
-        ctx.accounts.associted_bonding_curve.amount - ctx.accounts.config.init_supply;
+        ctx.accounts.associted_bonding_curve.amount - INIT_SUPPLY;
     require!(amount < available_qty, PumpFunError::NotEnoughSuppply);
 
     let current_supply =
-        ctx.accounts.config.max_supply - ctx.accounts.associted_bonding_curve.amount;
+        MAX_SUPPLY - ctx.accounts.associted_bonding_curve.amount;
     let required_lamports = calculate_cost(current_supply, amount, decimals);
 
     require!(

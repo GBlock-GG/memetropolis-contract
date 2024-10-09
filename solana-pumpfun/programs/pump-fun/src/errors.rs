@@ -9,3 +9,17 @@ pub enum PumpFunError {
   #[msg("Incorrect value of SOL sent")]
   InvalidSolAmount,
 }
+
+#[error_code]
+pub enum OftError {
+    Unauthorized,
+    InvalidSender,
+    InvalidDecimals,
+    SlippageExceeded,
+    InvalidTokenMint,
+    InvalidTokenEscrow,
+    InvalidTokenDest,
+    InvalidOptions,
+    InvalidEndpointProgram,
+    RateLimitExceeded,
+}

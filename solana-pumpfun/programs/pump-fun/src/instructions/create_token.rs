@@ -7,34 +7,42 @@ use anchor_spl::{
       mpl_token_metadata::{accounts::Metadata as MetadataAccount, types::DataV2},
       CreateMetadataAccountsV3, Metadata,
   },
-  token::{self, mint_to, Token},
-  token_interface::{Mint, TokenAccount},
+  token::Token,
+  token_interface::{Mint, MintTo, TokenAccount, mint_to},
 };
 
 #[derive(Accounts)]
 pub struct CreateToken<'info> {
+  #[account(mut)]
+  pub payer: Signer<'info>,
+
   #[account(
-  signer,
-  init,
-  payer = user,
-  mint::decimals = config.default_decimals,
-  mint::authority = mint_authority,
-  mint::token_program = token_program,
+    signer,
+    init,
+    payer = payer,
+    mint::decimals = 9,
+    mint::authority = oft_config,
+    mint::token_program = token_program,
   )]
   pub token_mint: InterfaceAccount<'info, Mint>,
 
-  /// CHECK
   #[account(
-    init_if_needed,
-    seeds = [
-      TOKEN_MINT_AUTHORITY_SEED.as_bytes(),
-      config.key().as_ref()
-    ],
-    payer = user,
-    space = 8,
+    init,
+    payer = payer,
+    space = 8 + OftConfig::INIT_SPACE,
+    seeds = [OFT_SEED, token_mint.key().as_ref()],
     bump
   )]
-  pub mint_authority: UncheckedAccount<'info>,
+  pub oft_config: Account<'info, OftConfig>,
+
+  #[account(
+    init,
+    payer = payer,
+    space = 8 + LzReceiveTypesAccounts::INIT_SPACE,
+    seeds = [LZ_RECEIVE_TYPES_SEED, &oft_config.key().as_ref()],
+    bump
+  )]
+  pub lz_receive_types_accounts: Account<'info, LzReceiveTypesAccounts>,
 
   #[account(
     seeds = [
@@ -52,7 +60,7 @@ pub struct CreateToken<'info> {
       BONDING_CURVE_SEED.as_bytes(),
       token_mint.key().as_ref()
     ],
-    payer = user,
+    payer = payer,
     space = 8,
     bump,
   )]
@@ -62,7 +70,7 @@ pub struct CreateToken<'info> {
     init,
     associated_token::mint = token_mint,
     associated_token::authority = bonding_curve,
-    payer = user,
+    payer = payer,
     token::token_program = token_program,
   )]
   pub associted_bonding_curve: Box<InterfaceAccount<'info, TokenAccount>>,
@@ -70,8 +78,8 @@ pub struct CreateToken<'info> {
   #[account(
     init,
     associated_token::mint = token_mint,
-    associated_token::authority = user,
-    payer = user,
+    associated_token::authority = payer,
+    payer = payer,
     token::token_program = token_program,
   )]
   pub associted_user_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
@@ -83,8 +91,6 @@ pub struct CreateToken<'info> {
   )]
   pub metadata: UncheckedAccount<'info>,
 
-  #[account(mut)]
-  pub user: Signer<'info>,
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub token_program: Program<'info, Token>,
   pub token_metadata_program: Program<'info, Metadata>,
@@ -95,17 +101,24 @@ pub struct CreateToken<'info> {
 impl CreateToken<'_> {
   pub fn apply(
     ctx: &mut Context<CreateToken>,
-    name: String,
-    symbol: String,
-    uri: String
+    params: &CreateTokenParams,
   ) -> Result<()> {
+    ctx.accounts.oft_config.bump = ctx.bumps.oft_config;
+    ctx.accounts.oft_config.token_mint = ctx.accounts.token_mint.key();
+    ctx.accounts.oft_config.token_program = ctx.accounts.token_program.key();
+    ctx.accounts.lz_receive_types_accounts.oft_config = ctx.accounts.oft_config.key();
+    ctx.accounts.lz_receive_types_accounts.token_mint = ctx.accounts.token_mint.key();
+    let oapp_signer = ctx.accounts.oft_config.key();
+    ctx.accounts.oft_config.init(
+      params.endpoint_program,
+      ctx.accounts.payer.key(),
+      SHARED_DECIMALS,
+      ctx.accounts.token_mint.decimals,
+      ctx.remaining_accounts,
+      oapp_signer,
+    )?;
 
-    let config_key = ctx.accounts.config.key();
-    let seeds = &[
-      TOKEN_MINT_AUTHORITY_SEED.as_bytes(),
-      config_key.as_ref(),
-      &[ctx.bumps.mint_authority],
-    ];
+    let seeds = &[OFT_SEED, &ctx.accounts.token_mint.key().to_bytes(), &[ctx.bumps.oft_config]];
     let signer_seeds = [&seeds[..]];
 
     // create metadata account
@@ -114,9 +127,9 @@ impl CreateToken<'_> {
       CreateMetadataAccountsV3 {
           metadata: ctx.accounts.metadata.to_account_info(),
           mint: ctx.accounts.token_mint.to_account_info(),
-          mint_authority: ctx.accounts.mint_authority.to_account_info(),
-          update_authority: ctx.accounts.mint_authority.to_account_info(),
-          payer: ctx.accounts.user.to_account_info(),
+          mint_authority: ctx.accounts.oft_config.to_account_info(),
+          update_authority: ctx.accounts.oft_config.to_account_info(),
+          payer: ctx.accounts.payer.to_account_info(),
           system_program: ctx.accounts.system_program.to_account_info(),
           rent: ctx.accounts.rent.to_account_info(),
       },
@@ -124,9 +137,9 @@ impl CreateToken<'_> {
     );
 
     let data_v2 = DataV2 {
-      name: name.clone(),
-      symbol: symbol.clone(),
-      uri: uri.clone(),
+      name: params.name.clone(),
+      symbol: params.symbol.clone(),
+      uri: params.uri.clone(),
       seller_fee_basis_points: 0,
       creators: None,
       collection: None,
@@ -134,28 +147,36 @@ impl CreateToken<'_> {
     };
 
     create_metadata_accounts_v3(cpi_context, data_v2, false, true, None)?;
-    //mint_to to bonding curve
-    let mint_to_cpi_context = CpiContext::new_with_signer(
-      ctx.accounts.token_program.to_account_info(),
-      token::MintTo {
-          mint: ctx.accounts.token_mint.to_account_info(),
-          to: ctx.accounts.associted_bonding_curve.to_account_info(),
-          authority: ctx.accounts.mint_authority.to_account_info(),
-      },
-      &signer_seeds,
-    );
 
-    mint_to(mint_to_cpi_context, ctx.accounts.config.max_supply)?;
+    //mint_to  MAX_SUPPLY to bonding curve
+    let cpi_accounts = MintTo {
+      mint: ctx.accounts.token_mint.to_account_info(),
+      to: ctx.accounts.associted_bonding_curve.to_account_info(),
+      authority: ctx.accounts.oft_config.to_account_info(),
+    };
+    let cpi_program = ctx.accounts.token_program.to_account_info();
+    let cpi_context = CpiContext::new(cpi_program, cpi_accounts);
+    mint_to(cpi_context.with_signer(&signer_seeds), MAX_SUPPLY)?;
+
     emit!(CreateTokenEvent {
-      creator: ctx.accounts.user.key(),
-      token_name: name,
-      token_symbol: symbol,
-      token_uri: uri,
+      creator: ctx.accounts.payer.key(),
+      token_name: params.name.clone(),
+      token_symbol: params.symbol.clone(),
+      token_uri: params.uri.clone(),
       mint: ctx.accounts.token_mint.key()
     });
 
     Ok(())
   }
 }
+
+#[derive(Clone, AnchorSerialize, AnchorDeserialize)]
+pub struct CreateTokenParams {
+  pub name: String,
+  pub symbol: String,
+  pub uri: String,
+  pub endpoint_program: Option<Pubkey>,
+}
+
 
 

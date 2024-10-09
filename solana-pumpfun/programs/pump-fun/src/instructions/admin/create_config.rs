@@ -30,9 +30,6 @@ impl CreateConfig<'_> {
     config.initialized = true;
     config.authority = ctx.accounts.authority.key();
     config.fee_recipient = params.fee_recipient;
-    config.max_supply = params.max_supply;
-    config.init_supply = params.init_supply;
-    config.default_decimals = params.default_decimals;
     Ok(())
   }
 }
@@ -40,7 +37,4 @@ impl CreateConfig<'_> {
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct CreateConfigParams {
   pub fee_recipient: Pubkey,
-  pub max_supply: u64,
-  pub init_supply: u64,
-  pub default_decimals: u8,
 }

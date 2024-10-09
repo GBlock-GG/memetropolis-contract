@@ -27,9 +27,6 @@ impl UpdateConfig<'_> {
     config.initialized = true;
     config.authority = ctx.accounts.authority.key();
     config.fee_recipient = params.fee_recipient;
-    config.max_supply = params.max_supply;
-    config.init_supply = params.init_supply;
-    config.default_decimals = params.default_decimals;
     Ok(())
   }
 }
