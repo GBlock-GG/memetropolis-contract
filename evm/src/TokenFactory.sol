@@ -37,26 +37,28 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
     /// @notice Maps meme token address to its associated details in `memeToken` struct.
     mapping(address => memeToken) public addressToMemeTokenMapping;
 
-    uint256 public immutable TOKEN_CREATOR_BONUS;
-    uint256 public immutable PLATFORM_FEE;
-    address public immutable PLATFORM_TREASURY_ADDRESS;
+    uint256 internal immutable TOKEN_CREATOR_BONUS;
+    uint256 internal immutable PLATFORM_FEE;
+    address internal immutable PLATFORM_TREASURY_ADDRESS;
 
     address public constant UNISWAP_V2_FACTORY_ADDRESS = 0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6;
     address public constant UNISWAP_V2_ROUTER_ADDRESS = 0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24;
     
-    uint256 public constant DECIMALS = 10 ** 18;
-    uint256 public constant MAX_SUPPLY = 1000000 * DECIMALS;
-    uint256 public constant INIT_SUPPLY = 20 * MAX_SUPPLY / 100;
+    uint256 internal constant DECIMALS = 10 ** 18;
+    uint256 internal constant MAX_SUPPLY = 1000000 * DECIMALS;
+    uint256 internal constant INIT_SUPPLY = 20 * MAX_SUPPLY / 100;
 
     uint256 public immutable INITIAL_PRICE;  // Initial price in wei (P0), 2 * 10^12
     uint256 public constant K = 5 * 10 ** 12;  // Growth rate (k), scaled to avoid precision loss (5 * 10^12)
 
-    uint8 public constant BUY_TYPE = 1;
-    uint8 public constant SELL_TYPE = 2;
+    uint8 internal constant BUY_TYPE = 1;
+    uint8 internal constant SELL_TYPE = 2;
     
     event CreatedMemeToken(address indexed tokenAddress, address indexed creator, string name, string symbol);
     event BoughtMemeToken(address indexed memeTokenAddress, address indexed user, uint tokenQty);
+    event BoughtCrosschainMemeToken(uint32 indexed srcEid, address indexed memeTokenAddress, address indexed user, uint tokenQty);
     event SoldMemeToken(address indexed memeTokenAddress, address indexed user, uint tokenQty);
+    event SoldCrosschainMemeToken(uint32 indexed srcEid, address indexed memeTokenAddress, address indexed user, uint tokenQty);
     
     error TokenNotListed();
     error FundingAlreadyRaised();
@@ -137,7 +139,7 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
     }
 
     function _lzReceive(
-        Origin calldata,
+        Origin calldata origin,
         bytes32,
         bytes calldata payload,
         address,  // Executor address as specified by the OApp.
@@ -150,9 +152,11 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
             if (msg.value < ethAmount)
                 revert IncorrectETHSent();
 
-            _buyMemeTokenInEth(memeTokenAddress, ethAmount, _to, 0);
+            uint256 tokenAmount = _buyMemeTokenInEth(memeTokenAddress, ethAmount, _to, 0);
+            emit BoughtCrosschainMemeToken(origin.srcEid, memeTokenAddress, _to, tokenAmount);
         } else if (msgType == SELL_TYPE) {
             _sellMemeToken(memeTokenAddress, _to, tokenQty);
+            emit SoldCrosschainMemeToken(origin.srcEid, memeTokenAddress, _to, tokenQty);
         }
     }
 
@@ -337,7 +341,9 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
     /// @param memeTokenAddress The address of the meme token contract.
     /// @param tokenQtyMin The minimum token amount to buy.
     function buyMemeTokenInEth(address memeTokenAddress, uint tokenQtyMin) external payable {
-        _buyMemeTokenInEth(memeTokenAddress, msg.value, msg.sender, tokenQtyMin);
+        uint256 tokenAmount = _buyMemeTokenInEth(memeTokenAddress, msg.value, msg.sender, tokenQtyMin);
+
+        emit BoughtMemeToken(memeTokenAddress, msg.sender, tokenAmount);
     }
 
     /// @notice Internal function which allows users to buy meme tokens using ETH.
@@ -345,7 +351,7 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
     /// @param ethAmount The ETH amount to send.
     /// @param _to The address to receive tokens.
     /// @param tokenQtyMin The minimum token amount to buy.
-    function _buyMemeTokenInEth(address memeTokenAddress, uint ethAmount, address _to, uint tokenQtyMin) internal {
+    function _buyMemeTokenInEth(address memeTokenAddress, uint ethAmount, address _to, uint tokenQtyMin) internal returns (uint256) {
         //check if memecoin is listed
         if (addressToMemeTokenMapping[memeTokenAddress].tokenAddress == address(0))
             revert TokenNotListed();
@@ -379,8 +385,7 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
 
         // transfer tokens
         memeTokenCt.transfer(_to, tokenAmountToPurchase);
-
-        emit BoughtMemeToken(memeTokenAddress, _to, tokenAmountToPurchase);
+        return tokenAmountToPurchase;
     }
 
     /// @notice Allows users to sell meme tokens for ETH.
@@ -388,7 +393,10 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
     /// @param tokenQty The number of tokens to sell.
     /// @return The amount of ETH received in return.
     function sellMemeToken(address memeTokenAddress, uint tokenQty) external nonReentrant returns(uint) {
-        return _sellMemeToken(memeTokenAddress, msg.sender, tokenQty);
+        uint256 ethAmount = _sellMemeToken(memeTokenAddress, msg.sender, tokenQty);
+
+        emit SoldMemeToken(memeTokenAddress, msg.sender, tokenQty);
+        return ethAmount;
     }
 
     /// @notice Internal function which allows users to sell meme tokens for ETH.
@@ -420,8 +428,6 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
         (bool success, ) = payable(from).call{value: ethAmount}("");
         if (!success)
             revert FailedToSendETH();
-
-        emit SoldMemeToken(memeTokenAddress, from, tokenQty);
 
         return ethAmount;
     }

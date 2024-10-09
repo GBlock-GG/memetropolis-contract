@@ -7,7 +7,7 @@
     "deploy": "make deploy-local",
     "deploy:bnbTestnet": "make deploy-bnbTestnet",
     "deploy:baseTestnet": "make deploy-baseTestnet",
-    "verify:baseToken": "make verify-baseToken"
+    "verify:bnbToken": "make verify-bnbToken"
   },
   "dependencies": {
     "@layerzerolabs/lz-evm-messagelib-v2": "^3.0.1",

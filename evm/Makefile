@@ -23,12 +23,12 @@ deploy-bnb:
 	forge script script/bnb/DeployTokenFactory.s.sol --rpc-url $(RPC_URL) \
 		--private-key $(DEPLOYER_PRIVATE_KEY) --broadcast $(EXTRA_FLAGS) -vvvv
 
-verify-baseToken:
+verify-bnbToken:
 	@echo "Running verify "
 	@rm -rf out && \
 	forge verify-contract  \
 		--etherscan-api-key ${BNB_TEST_ETHERSCAN_API_KEY} \
 		--verifier-url ${BNB_TEST_ETHERSCAN_API_URL} \
 		--constructor-args-path constructor-args/Token.txt \
-		0xB6077506e84e7535e11187e4aE265B149ff63422 \
+		0xF37Ca447b60125074e03Ed26772cAEDDE6FEEA3e \
 		src/Token.sol:Token
