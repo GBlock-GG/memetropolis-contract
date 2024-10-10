@@ -8,6 +8,10 @@ pub enum PumpFunError {
   NotEnoughSuppply,
   #[msg("Incorrect value of SOL sent")]
   InvalidSolAmount,
+  #[msg("BondingCurve: Input must be greater than zero")]
+  InvalidInput,
+  #[msg("Slippage Exceed")]
+  SlippageExceed
 }
 
 #[error_code]

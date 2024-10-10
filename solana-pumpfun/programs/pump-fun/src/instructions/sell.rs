@@ -50,9 +50,8 @@ impl Sell<'_> {
   pub fn apply(
     ctx: &mut Context<Sell>,
     amount: u64,         //sell token Amount
-    min_sol_output: u64, // max Sol amount for slippage
   ) -> Result<()> {
-    let decimals = (10 as u64).pow(ctx.accounts.token_mint.decimals as u32);
+    let decimals = ctx.accounts.token_mint.decimals;
 
     // transfer token from user to vault
     transfer_token_from_user_to_vault(
@@ -64,8 +63,10 @@ impl Sell<'_> {
         amount,
         ctx.accounts.token_mint.decimals,
     )?;
-    let sol_amount = amount * INITIAL_PRICE / decimals;
-    require!(sol_amount >= min_sol_output, PumpFunError::InvalidSolAmount);
+    let current_supply =
+        MAX_SUPPLY - ctx.accounts.associted_bonding_curve.amount;
+
+    let sol_amount = calculate_cost(current_supply - amount, amount, decimals);
 
     //transfer sol from vault to user
     transfer_sol_from_vault_to_user(

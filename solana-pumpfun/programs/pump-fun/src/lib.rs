@@ -63,8 +63,12 @@ pub mod pump_fun {
     Buy::apply(&mut ctx, amount, max_sol_cost)
   }
 
-  pub fn sell(mut ctx: Context<Sell>, amount: u64, min_sol_output: u64) -> Result<()> {
-    Sell::apply(&mut ctx, amount, min_sol_output)
+  pub fn buy_in_sol(mut ctx: Context<BuyInSol>, amount_min: u64, sol: u64) -> Result<()> {
+    BuyInSol::apply(&mut ctx, amount_min, sol)
+  }
+
+  pub fn sell(mut ctx: Context<Sell>, amount: u64) -> Result<()> {
+    Sell::apply(&mut ctx, amount)
   }
 
   pub fn withdraw(mut ctx: Context<Withdraw>) -> Result<()> {
