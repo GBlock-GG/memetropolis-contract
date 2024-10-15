@@ -35,8 +35,8 @@ pub const ENFORCED_OPTIONS_SEED: &[u8] = b"EnforcedOptions";
 pub const LZ_RECEIVE_TYPES_SEED: &[u8] = oapp::LZ_RECEIVE_TYPES_SEED;
 
 pub const SHARED_DECIMALS:u8 = 6;
-pub const MAX_SUPPLY:u64 = 1000_000_000_000;
-pub const INIT_SUPPLY:u64 = 200_000_000_000;
+pub const MAX_SUPPLY:u64 = 1000_000_000_000_000;
+pub const INIT_SUPPLY:u64 = 200_000_000_000_000;
 
 
 #[program]
