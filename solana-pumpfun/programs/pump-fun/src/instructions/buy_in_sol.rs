@@ -7,7 +7,7 @@ use anchor_spl::{
 };
 
 #[derive(Accounts)]
-pub struct Buy<'info> {
+pub struct BuyInSol<'info> {
   #[account(address = oft_config.token_mint)]
   pub token_mint: Box<InterfaceAccount<'info, Mint>>,
 
@@ -60,8 +60,8 @@ pub struct Buy<'info> {
     pub system_program: Program<'info, System>,
 }
 
-impl Buy<'_> {
-  pub fn apply(ctx: &mut Context<Buy>, amount: u64, max_sol_cost: u64) -> Result<()> {
+impl BuyInSol<'_> {
+  pub fn apply(ctx: &mut Context<BuyInSol>, amount_min: u64, sol: u64) -> Result<()> {
     let decimals = ctx.accounts.token_mint.decimals;
 
     // check to ensure funding goal is not met
@@ -69,25 +69,23 @@ impl Buy<'_> {
         ctx.accounts.associted_bonding_curve.amount > INIT_SUPPLY,
         PumpFunError::AlreadyRaised
     );
+    let current_supply =
+      MAX_SUPPLY - ctx.accounts.associted_bonding_curve.amount;
+
+    let token_amount_to_purchased = calculate_token_amount(current_supply, sol, decimals);
+    require!(token_amount_to_purchased >= amount_min, PumpFunError::SlippageExceed);
 
     let available_qty =
         ctx.accounts.associted_bonding_curve.amount - INIT_SUPPLY;
-    require!(amount <= available_qty, PumpFunError::NotEnoughSuppply);
 
-    let current_supply =
-        MAX_SUPPLY - ctx.accounts.associted_bonding_curve.amount;
-    let required_lamports = calculate_cost(current_supply, amount, decimals);
+    require!(token_amount_to_purchased <= available_qty, PumpFunError::NotEnoughSuppply);
 
-    require!(
-        max_sol_cost >= required_lamports,
-        PumpFunError::InvalidSolAmount
-    );
 
     //transfer sol to vault
     transfer_sol(
         ctx.accounts.user.to_account_info(),
         ctx.accounts.bonding_curve.to_account_info(),
-        required_lamports,
+        sol,
     )?;
     //transfer fee
 
@@ -106,14 +104,14 @@ impl Buy<'_> {
         ctx.accounts.associted_user_token_account.to_account_info(),
         ctx.accounts.token_mint.to_account_info(),
         ctx.accounts.token_program.to_account_info(),
-        amount,
+        token_amount_to_purchased,
         decimals,
         vault_signer_seeds,
     )?;
     emit!(BuyEvent {
         mint: ctx.accounts.token_mint.key(),
-        token_output: amount,
-        sol_input: required_lamports,
+        token_output: token_amount_to_purchased,
+        sol_input: sol,
         buyer: ctx.accounts.user.key()
     });
     Ok(())
