@@ -8,7 +8,7 @@ library LogExpMath {
     /// @notice Helper function to approximate e^x using a Taylor series expansion.
     /// @param x The exponent value.
     /// @return The approximated result of e^x.
-    function exp(uint256 x) internal pure returns (uint256) {
+    function exp(uint256 x) external pure returns (uint256) {
         uint256 sum = 10**18;  // Start with 1 * 10^18 for precision
         uint256 term = 10**18;  // Initial term = 1 * 10^18
         uint256 xPower = x;  // Initial power of x
@@ -82,7 +82,7 @@ library LogExpMath {
         return int128(result);
     }
 
-    function ln(uint256 x) internal pure returns (uint256) {
+    function ln(uint256 x) external pure returns (uint256) {
         require(x > 0, "BondingCurve: Input must be greater than zero");
 
         int128 log2Result = log_2(x); // log_2 in 64.64 format
