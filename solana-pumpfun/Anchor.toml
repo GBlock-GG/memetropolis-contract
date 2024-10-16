@@ -7,14 +7,14 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-pump_fun = "DT2ovnYP2YHS6DWEQJ9ARHgznY97cydTcmkGAESfaagC"
+pump_fun = "DeKbZLf5Wei5y6EzWwruVA4Hcz1icUbjeuwJapyDQ3Vk"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
 cluster = "Localnet"
-wallet = "~/.config/solana/id.json"
+wallet = "/home/ubuntu/.config/solana/id.json"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/withdraw.test.ts"
