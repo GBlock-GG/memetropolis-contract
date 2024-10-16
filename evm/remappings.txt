@@ -1,0 +1,6 @@
+@uniswap-v2-core-1.0.1=dependencies/@uniswap-v2-core-1.0.1
+@uniswap-v2-periphery-1.1.0-beta.0=dependencies/@uniswap-v2-periphery-1.1.0-beta.0
+@layerzerolabs=node_modules/@layerzerolabs
+@openzeppelin=node_modules/@openzeppelin
+solidity-bytes-utils=node_modules/solidity-bytes-utils
+hardhat-deploy=node_modules/hardhat-deploy
