@@ -19,7 +19,7 @@ use oapp::{
 };
 
 
-declare_id!("5LYPhunsULS1z59XE5nvaciuTYxa2M5foFMXhSKuXfv1");
+declare_id!("DeKbZLf5Wei5y6EzWwruVA4Hcz1icUbjeuwJapyDQ3Vk");
 
 pub mod admin {
     use anchor_lang::prelude::declare_id;
