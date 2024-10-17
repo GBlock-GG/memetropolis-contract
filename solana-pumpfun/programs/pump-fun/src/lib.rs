@@ -19,15 +19,7 @@ use oapp::{
 };
 
 
-declare_id!("DeKbZLf5Wei5y6EzWwruVA4Hcz1icUbjeuwJapyDQ3Vk");
-
-pub mod admin {
-    use anchor_lang::prelude::declare_id;
-    #[cfg(feature = "devnet")]
-    declare_id!("FukUMnHm7SUMMHFkgB5vXF4c8E1HP2ZxXKM9yDXHTYp");
-    #[cfg(not(feature = "devnet"))]
-    declare_id!("FukUMnHm7SUMMHFkgB5vXF4c8E1HP2ZxXKM9yDXHTYp");
-}
+declare_id!("ABGjHbpm7gcnpYuNVUHEiXwKFm8RWjYfgJCvdscxUn2h");
 
 pub const OFT_SEED: &[u8] = b"Oft";
 pub const PEER_SEED: &[u8] = b"Peer";
@@ -38,7 +30,6 @@ pub const SHARED_DECIMALS:u8 = 6;
 pub const MAX_SUPPLY:u64 = 1000_000_000_000_000;
 pub const INIT_SUPPLY:u64 = 200_000_000_000_000;
 
-
 #[program]
 pub mod pump_fun {
   use super::*;
@@ -47,7 +38,7 @@ pub mod pump_fun {
     CreateConfig::apply(&mut ctx, &params)
   }
 
-  pub fn update_config(mut ctx: Context<UpdateConfig>, params: CreateConfigParams) -> Result<()> {
+  pub fn update_config(mut ctx: Context<UpdateConfig>, params: UpdateConfigParams) -> Result<()> {
     UpdateConfig::apply(&mut ctx, &params)
   }
 

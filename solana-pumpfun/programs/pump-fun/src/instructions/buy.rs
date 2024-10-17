@@ -20,11 +20,10 @@ pub struct Buy<'info> {
   #[account(
     seeds = [
       CONFIG_SEED.as_bytes(),
-      config.authority.as_ref(),
     ],
-    bump
+    bump = global_config.bump
   )]
-  pub config: Box<Account<'info, Config>>,
+  pub global_config: Box<Account<'info, GlobalConfig>>,
 
     /// CHECK
   #[account(
