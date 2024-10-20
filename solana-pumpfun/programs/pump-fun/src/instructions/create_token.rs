@@ -44,16 +44,7 @@ pub struct CreateToken<'info> {
   )]
   pub lz_receive_types_accounts: Account<'info, LzReceiveTypesAccounts>,
 
-  #[account(
-    seeds = [
-      CONFIG_SEED.as_bytes(),
-      config.authority.as_ref(),
-    ],
-    bump
-  )]
-  pub config: Box<Account<'info, Config>>,
-
-    /// CHECK
+  /// CHECK
   #[account(
     init,
     seeds = [

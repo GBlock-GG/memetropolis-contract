@@ -8,20 +8,28 @@ use anchor_spl::{
 #[derive(Accounts)]
 pub struct Withdraw<'info> {
     /// Admin address
-    #[account(
+  #[account(
       mut,
-      address = crate::admin::id()
+      address = global_config.admin
   )]
-    pub authority: Signer<'info>,
+  pub authority: Signer<'info>,
 
-    #[account(
+  #[account(
+    seeds = [
+      CONFIG_SEED.as_bytes(),
+    ],
+    bump = global_config.bump
+  )]
+  pub global_config: Box<Account<'info, GlobalConfig>>,
+
+  #[account(
     mut,
     mint::token_program = token_program,
   )]
-    pub token_mint: Box<InterfaceAccount<'info, Mint>>,
+  pub token_mint: Box<InterfaceAccount<'info, Mint>>,
 
     /// CHECK
-    #[account(
+  #[account(
       mut,
       seeds = [
       BONDING_CURVE_SEED.as_bytes(),
