@@ -85,9 +85,10 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
 
     /// @notice Allows users to buy meme tokens using ETH.
     /// @param memeTokenAddress The address of the meme token contract.
+    /// @param recipientAddress The recipient address.
     /// @param ethAmount The Eth amount.
-    function buyCrosschainMemetoken(uint32 _dstEid, address memeTokenAddress, uint128 ethAmount) external payable {
-        bytes memory message = abi.encode(BUY_TYPE, memeTokenAddress, msg.sender, ethAmount, 0);
+    function buyCrosschainMemetoken(uint32 _dstEid, bytes32 memeTokenAddress, bytes32 recipientAddress, uint128 ethAmount) external payable {
+        bytes memory message = abi.encode(BUY_TYPE, memeTokenAddress, recipientAddress, ethAmount, 0);
         bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(200000, ethAmount);
         _lzSend(
             _dstEid,
@@ -101,10 +102,11 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
     /// @notice Use this function to estimate fees for your cross-chain buyCrosschainMemetoken()
     function quoteBuyCrossChainMemetoken(
         uint32 _dstEid,
-        address memeTokenAddress,
+        bytes32 memeTokenAddress,
+        bytes32 recipientAddress,
         uint128 ethAmount
     ) external view returns (uint256 nativeFee, uint256 lzTokenFee) {
-        bytes memory message = abi.encode(BUY_TYPE, memeTokenAddress, msg.sender, ethAmount, 0);
+        bytes memory message = abi.encode(BUY_TYPE, memeTokenAddress, recipientAddress, ethAmount, 0);
         bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(200000, ethAmount);
         MessagingFee memory fee = _quote(_dstEid, message, options, false);
         return (fee.nativeFee, fee.lzTokenFee);
@@ -112,9 +114,10 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
 
     /// @notice Allows users to buy meme tokens using ETH.
     /// @param memeTokenAddress The address of the meme token contract.
+    /// @param recipientAddress The recipient address.
     /// @param tokenQty The Token amount to sell.
-    function sellCrosschainMemetoken(uint32 _dstEid, address memeTokenAddress, uint256 tokenQty) external payable {
-        bytes memory message = abi.encode(SELL_TYPE, memeTokenAddress, msg.sender, 0, tokenQty);
+    function sellCrosschainMemetoken(uint32 _dstEid, bytes32 memeTokenAddress, bytes32 recipientAddress, uint256 tokenQty) external payable {
+        bytes memory message = abi.encode(SELL_TYPE, memeTokenAddress, recipientAddress, 0, tokenQty);
         bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(200000, 0);
         _lzSend(
             _dstEid,
@@ -128,10 +131,11 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
     /// @notice Use this function to estimate fees for your cross-chain buyCrosschainMemetoken()
     function quoteSellCrossChainMemetoken(
         uint32 _dstEid,
-        address memeTokenAddress,
+        bytes32 memeTokenAddress,
+        bytes32 recipientAddress,
         uint256 tokenQty
     ) external view returns (uint256 nativeFee, uint256 lzTokenFee) {
-        bytes memory message = abi.encode(SELL_TYPE, memeTokenAddress, msg.sender, 0, tokenQty);
+        bytes memory message = abi.encode(SELL_TYPE, memeTokenAddress, recipientAddress, 0, tokenQty);
         bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(200000, 0);
         
         MessagingFee memory fee = _quote(_dstEid, message, options, false);
@@ -146,7 +150,9 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
         bytes calldata  // Any extra data or options to trigger on receipt.
     ) internal override {
         // Decode the payload to get the message
-        (uint8 msgType, address memeTokenAddress, address _to, uint256 ethAmount, uint256 tokenQty) = abi.decode(payload, (uint8, address, address, uint256, uint256));
+        (uint8 msgType, bytes32 memeTokenAddressBytes, bytes32 _toBytes, uint256 ethAmount, uint256 tokenQty) = abi.decode(payload, (uint8, bytes32, bytes32, uint256, uint256));
+        address memeTokenAddress = address(uint160(uint256(memeTokenAddressBytes)));
+        address _to = address(uint160(uint256(_toBytes)));
 
         if (msgType == BUY_TYPE) {
             if (msg.value < ethAmount)
