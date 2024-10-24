@@ -17,7 +17,6 @@ contract TokenFactoryTest is TestHelperOz5 {
     uint PLATFORM_FEE = 0.6 ether;
     uint INITIAL_PRICE = 2 * 10 ** 12;
     address constant LZ_ENDPOINT_V2_ADDRESS = 0x6EDCE65403992e310A62460808c4b910D972f10f; // 0x1a44076050125825900e736c501f859c50fE728c
-    uint256 internal constant MAX_SUPPLY = 1000000 * DECIMALS;
 
     uint32 aEid = 1;
     uint32 bEid = 2;
@@ -61,8 +60,8 @@ contract TokenFactoryTest is TestHelperOz5 {
         console.log("Init token balance: ", Token(tokenAddress).balanceOf(address(this)));
 
         uint128 ethAmount = 10**17;
-        (uint256 nativeFee, ) = aFactory.quoteBuyCrossChainMemetoken(2, addressToBytes32(address(tokenAddress)), addressToBytes32(address(this)), ethAmount);
-        aFactory.buyCrosschainMemetoken{ value: nativeFee }(2, addressToBytes32(address(tokenAddress)), addressToBytes32(address(this)), ethAmount);
+        (uint256 nativeFee, ) = aFactory.quoteBuyCrossChainMemetoken(2, tokenAddress, ethAmount);
+        aFactory.buyCrosschainMemetoken{ value: nativeFee }(2, tokenAddress, ethAmount);
 
         // verify packet to bFactory manually
         verifyPackets(bEid, addressToBytes32(address(bFactory)));
@@ -90,8 +89,8 @@ contract TokenFactoryTest is TestHelperOz5 {
         
         uint prevEthBalance = address(this).balance;
 
-        (uint256 nativeFee, ) = aFactory.quoteSellCrossChainMemetoken(2, addressToBytes32(address(tokenAddress)), addressToBytes32(address(this)), sellTokenQty);
-        aFactory.sellCrosschainMemetoken{ value: nativeFee }(2, addressToBytes32(address(tokenAddress)), addressToBytes32(address(this)), sellTokenQty);
+        (uint256 nativeFee, ) = aFactory.quoteSellCrossChainMemetoken(2, tokenAddress, sellTokenQty);
+        aFactory.sellCrosschainMemetoken{ value: nativeFee }(2, tokenAddress, sellTokenQty);
 
         // verify packet to bFactory manually
         verifyPackets(bEid, addressToBytes32(address(bFactory)));
@@ -104,7 +103,7 @@ contract TokenFactoryTest is TestHelperOz5 {
         address tokenAddress = factory.createMemeToken("Test", "TEST", "img://img.png", "hello there");
         Token token = Token(tokenAddress);
 
-        assertEq(token.balanceOf(address(factory)), MAX_SUPPLY);
+        assertEq(token.balanceOf(address(factory)), factory.MAX_SUPPLY());
     }
 
     function test_BuyMemeToken() public {

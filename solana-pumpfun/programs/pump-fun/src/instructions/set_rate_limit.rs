@@ -6,16 +6,16 @@ pub struct SetRateLimit<'info> {
     pub admin: Signer<'info>,
     #[account(
         mut,
-        seeds = [PEER_SEED, &oft_config.key().to_bytes(), &params.dst_eid.to_be_bytes()],
+        seeds = [PEER_SEED, &oapp_config.key().to_bytes(), &params.dst_eid.to_be_bytes()],
         bump
     )]
-    pub peer: Account<'info, Peer>,
+    pub peer: Box<Account<'info, Peer>>,
     #[account(
-        seeds = [OFT_SEED, &get_oft_config_seed(&oft_config).to_bytes()],
-        bump = oft_config.bump,
+        seeds = [OAPP_SEED],
+        bump = oapp_config.bump,
         has_one = admin @OftError::Unauthorized
     )]
-    pub oft_config: Account<'info, OftConfig>,
+    pub oapp_config: Box<Account<'info, OAppConfig>>,
 }
 
 impl SetRateLimit<'_> {

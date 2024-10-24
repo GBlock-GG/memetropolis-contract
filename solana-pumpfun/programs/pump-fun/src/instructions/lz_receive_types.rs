@@ -9,12 +9,10 @@ use oapp::endpoint_cpi::LzAccount;
 #[derive(Accounts)]
 pub struct LzReceiveTypes<'info> {
     #[account(
-        seeds = [OFT_SEED, &get_oft_config_seed(&oft_config).to_bytes()],
-        bump = oft_config.bump
+        seeds = [OAPP_SEED],
+        bump = oapp_config.bump
     )]
-    pub oft_config: Account<'info, OftConfig>,
-    #[account(address = oft_config.token_mint)]
-    pub token_mint: InterfaceAccount<'info, Mint>,
+    pub oapp_config: Box<Account<'info, OAppConfig>>,
 }
 
 // account structure
@@ -38,10 +36,10 @@ impl LzReceiveTypes<'_> {
         ctx: &Context<LzReceiveTypes>,
         params: &LzReceiveParams,
     ) -> Result<Vec<LzAccount>> {
-        let oft = &ctx.accounts.oft_config;
+        let oapp_info = &ctx.accounts.oapp_config;
 
         let (peer, _) = Pubkey::find_program_address(
-            &[PEER_SEED, &oft.key().to_bytes(), &params.src_eid.to_be_bytes()],
+            &[PEER_SEED, &oapp_info.key().to_bytes(), &params.src_eid.to_be_bytes()],
             ctx.program_id,
         );
 
@@ -52,8 +50,8 @@ impl LzReceiveTypes<'_> {
         ];
 
         // account 2..3
-        let (oft_config, _) = Pubkey::find_program_address(
-            &[OFT_SEED, &get_oft_config_seed(&oft).to_bytes()],
+        let (oapp_config, _) = Pubkey::find_program_address(
+            &[OAPP_SEED],
             ctx.program_id,
         );
         // let token_escrow = if let OftConfigExt::Adapter(token_escrow) = oft.ext {
@@ -62,23 +60,15 @@ impl LzReceiveTypes<'_> {
         //     LzAccount { pubkey: ctx.program_id.key(), is_signer: false, is_writable: false }
         // };
         accounts.extend_from_slice(&[
-            LzAccount { pubkey: oft_config, is_signer: false, is_writable: false }, // 2
-            // token_escrow,                                                           // 3
+            LzAccount { pubkey: oapp_config, is_signer: false, is_writable: false }, // 2
         ]);
 
         // account 4..8
-        let to_address = Pubkey::from(msg_codec::send_to(&params.message));
-        let token_dest = get_associated_token_address_with_program_id(
-            &to_address,
-            &ctx.accounts.oft_config.token_mint,
-            &ctx.accounts.oft_config.token_program,
-        );
+        let token_mint = Pubkey::from(msg_codec::get_meme_addr(&params.message));
+        let to_address = Pubkey::from(msg_codec::get_receipt_addr(&params.message));
         accounts.extend_from_slice(&[
-            LzAccount { pubkey: to_address, is_signer: false, is_writable: false }, // 4
-            LzAccount { pubkey: token_dest, is_signer: false, is_writable: true },  // 5
-            LzAccount { pubkey: oft.token_mint, is_signer: false, is_writable: true }, // 6
-            LzAccount { pubkey: oft.token_program, is_signer: false, is_writable: false }, // 7
-            LzAccount { pubkey: ASSOCIATED_TOKEN_ID, is_signer: false, is_writable: false }, // 8
+            LzAccount { pubkey: token_mint, is_signer: false, is_writable: false }, // 4
+            LzAccount { pubkey: to_address, is_signer: false, is_writable: true }, // 5
         ]);
 
         // account 9..11
@@ -94,38 +84,17 @@ impl LzReceiveTypes<'_> {
             LzAccount { pubkey: ctx.program_id.key(), is_signer: false, is_writable: false }, // 11
         ]);
 
-        let endpoint_program = ctx.accounts.oft_config.endpoint_program;
+        let endpoint_program = ctx.accounts.oapp_config.endpoint_program;
         // remaining accounts 0..9
         let accounts_for_clear = oapp::endpoint_cpi::get_accounts_for_clear(
             endpoint_program,
-            &oft.key(),
+            &oapp_info.key(),
             params.src_eid,
             &params.sender,
             params.nonce,
         );
         accounts.extend(accounts_for_clear);
 
-        // remaining accounts 9..16
-        if let Some(message) = msg_codec::compose_msg(&params.message) {
-            let amount_sd = msg_codec::amount_sd(&params.message);
-            let amount_ld = ctx.accounts.oft_config.sd2ld(amount_sd);
-            let amount_received_ld = amount_ld;
-
-            let accounts_for_composing = oapp::endpoint_cpi::get_accounts_for_send_compose(
-                endpoint_program,
-                &oft.key(),
-                &to_address,
-                &params.guid,
-                0,
-                &compose_msg_codec::encode(
-                    params.nonce,
-                    params.src_eid,
-                    amount_received_ld,
-                    &message,
-                ),
-            );
-            accounts.extend(accounts_for_composing);
-        }
 
         Ok(accounts)
     }

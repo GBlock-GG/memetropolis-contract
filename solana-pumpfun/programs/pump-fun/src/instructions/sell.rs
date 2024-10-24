@@ -8,23 +8,29 @@ use anchor_spl::{
 
 #[derive(Accounts)]
 pub struct Sell<'info> {
-    #[account(
-    mint::token_program = token_program,
-  )]
-    pub token_mint: InterfaceAccount<'info, Mint>,
+  pub token_mint: Box<InterfaceAccount<'info, Mint>>,
 
-    /// CHECK
-    #[account(
+  #[account(
+    seeds = [
+      CONFIG_SEED,
+    ],
+    bump = global_config.bump
+  )]
+  pub global_config: Box<Account<'info, GlobalConfig>>,
+
+
+  /// CHECK
+  #[account(
     mut,
     seeds = [
-      BONDING_CURVE_SEED.as_bytes(),
+      BONDING_CURVE_SEED,
       token_mint.key().as_ref()
     ],
     bump,
   )]
-    pub bonding_curve: UncheckedAccount<'info>,
+  pub bonding_curve: UncheckedAccount<'info>,
 
-    #[account(
+  #[account(
     mut,
     associated_token::mint = token_mint,
     associated_token::authority = bonding_curve,

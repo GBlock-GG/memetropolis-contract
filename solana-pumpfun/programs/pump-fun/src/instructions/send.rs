@@ -18,7 +18,7 @@ pub struct Send<'info> {
         ],
         bump = peer.bump
     )]
-    pub peer: Account<'info, Peer>,
+    pub peer: Box<Account<'info, Peer>>,
     #[account(
         seeds = [
             ENFORCED_OPTIONS_SEED,
@@ -27,33 +27,33 @@ pub struct Send<'info> {
         ],
         bump = enforced_options.bump
     )]
-    pub enforced_options: Account<'info, EnforcedOptions>,
+    pub enforced_options: Box<Account<'info, EnforcedOptions>>,
     #[account(
-        seeds = [OFT_SEED, &get_oft_config_seed(&oft_config).to_bytes()],
+        seeds = [OAPP_SEED],
         bump = oft_config.bump
     )]
-    pub oft_config: Account<'info, OftConfig>,
-    #[account(
-        mut,
-        token::authority = signer,
-        token::mint = token_mint,
-        token::token_program = token_program,
-    )]
-    pub token_source: InterfaceAccount<'info, TokenAccount>,
-    #[account(
-        mut,
-        address = oft_config.token_mint,
-        mint::token_program = token_program
-    )]
-    pub token_mint: InterfaceAccount<'info, Mint>,
-    pub token_program: Interface<'info, TokenInterface>,
+    pub oft_config: Account<'info, OAppConfig>,
+    // #[account(
+    //     mut,
+    //     token::authority = signer,
+    //     token::mint = token_mint,
+    //     token::token_program = token_program,
+    // )]
+    // pub token_source: InterfaceAccount<'info, TokenAccount>,
+    // #[account(
+    //     mut,
+    //     address = oft_config.token_mint,
+    //     mint::token_program = token_program
+    // )]
+    // pub token_mint: InterfaceAccount<'info, Mint>,
+    // pub token_program: Interface<'info, TokenInterface>,
 }
 
 impl Send<'_> {
     pub fn apply(ctx: &mut Context<Send>, params: &SendParams) -> Result<MessagingReceipt> {
         // 1. Quote the amount with token2022 fee and dedust it
-        let amount_received_ld = ctx.accounts.oft_config.remove_dust(params.amount_ld);
-        require!(amount_received_ld >= params.min_amount_ld, OftError::SlippageExceeded);
+        // let amount_received_ld = ctx.accounts.oft_config.remove_dust(params.amount_ld);
+        // require!(amount_received_ld >= params.min_amount_ld, OftError::SlippageExceeded);
 
         // 2. Calculate the (minimum) required amount to send to receive exactly amount_received_ld
         // amount_sent_ld does not have to be dedusted, because it is collected or burned locally

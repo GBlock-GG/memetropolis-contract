@@ -9,16 +9,16 @@ pub struct SetEnforcedOptions<'info> {
         init_if_needed,
         payer = admin,
         space = 8 + EnforcedOptions::INIT_SPACE,
-        seeds = [ENFORCED_OPTIONS_SEED, &oft_config.key().to_bytes(), &params.dst_eid.to_be_bytes()],
+        seeds = [ENFORCED_OPTIONS_SEED, &oapp_config.key().to_bytes(), &params.dst_eid.to_be_bytes()],
         bump
     )]
-    pub enforced_options: Account<'info, EnforcedOptions>,
+    pub enforced_options: Box<Account<'info, EnforcedOptions>>,
     #[account(
-        seeds = [OFT_SEED, &get_oft_config_seed(&oft_config).to_bytes()],
-        bump = oft_config.bump,
+        seeds = [OAPP_SEED],
+        bump = oapp_config.bump,
         has_one = admin @OftError::Unauthorized
     )]
-    pub oft_config: Account<'info, OftConfig>,
+    pub oapp_config: Box<Account<'info, OAppConfig>>,
     pub system_program: Program<'info, System>,
 }
 

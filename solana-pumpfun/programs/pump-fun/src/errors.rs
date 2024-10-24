@@ -21,6 +21,7 @@ pub enum OftError {
     InvalidDecimals,
     SlippageExceeded,
     InvalidTokenMint,
+    InvalidReceiver,
     InvalidTokenEscrow,
     InvalidTokenDest,
     InvalidOptions,

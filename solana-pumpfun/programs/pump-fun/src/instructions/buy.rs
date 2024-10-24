@@ -8,18 +8,12 @@ use anchor_spl::{
 
 #[derive(Accounts)]
 pub struct Buy<'info> {
-  #[account(address = oft_config.token_mint)]
+
   pub token_mint: Box<InterfaceAccount<'info, Mint>>,
 
   #[account(
-    seeds = [OFT_SEED, &get_oft_config_seed(&oft_config).to_bytes()],
-    bump = oft_config.bump
-  )]
-  pub oft_config: Account<'info, OftConfig>,
-
-  #[account(
     seeds = [
-      CONFIG_SEED.as_bytes(),
+      CONFIG_SEED,
     ],
     bump = global_config.bump
   )]
@@ -29,7 +23,7 @@ pub struct Buy<'info> {
   #[account(
     mut,
     seeds = [
-      BONDING_CURVE_SEED.as_bytes(),
+      BONDING_CURVE_SEED,
       token_mint.key().as_ref()
     ],
     bump,
@@ -93,7 +87,7 @@ impl Buy<'_> {
     //transfer token from vault to user
     let token_mint = ctx.accounts.token_mint.key();
     let vault_seeds = &[
-        BONDING_CURVE_SEED.as_bytes(),
+        BONDING_CURVE_SEED,
         token_mint.as_ref(),
         &[ctx.bumps.bonding_curve],
     ];

@@ -1,8 +1,10 @@
 use crate::*;
 
-const SEND_TO_OFFSET: usize = 0;
-const SEND_AMOUNT_SD_OFFSET: usize = 32;
-const COMPOSE_MSG_OFFSET: usize = 40;
+const SELL_BUY_TYPE_OFFSET: usize = 0;
+const MEME_TOKEN_ADDRESS_OFFSET: usize = 1;
+const RECEIPT_ADDRESS_OFFSET: usize = 33;
+const SOL_AMOUNT_OFFSET: usize = 65;
+const TOKEN_AMOUNT_OFFSET: usize = 73;
 
 pub fn encode(
     send_to: [u8; 32],
@@ -25,22 +27,30 @@ pub fn encode(
     }
 }
 
-pub fn send_to(message: &[u8]) -> [u8; 32] {
-    let mut send_to = [0; 32];
-    send_to.copy_from_slice(&message[SEND_TO_OFFSET..SEND_AMOUNT_SD_OFFSET]);
-    send_to
+pub fn is_buy_token(message:&[u8]) -> bool {
+    message[0] == 1
 }
 
-pub fn amount_sd(message: &[u8]) -> u64 {
-    let mut amount_sd_bytes = [0; 8];
-    amount_sd_bytes.copy_from_slice(&message[SEND_AMOUNT_SD_OFFSET..COMPOSE_MSG_OFFSET]);
-    u64::from_be_bytes(amount_sd_bytes)
+pub fn get_meme_addr(message: &[u8]) -> [u8; 32] {
+    let mut meme_addr = [0; 32];
+    meme_addr.copy_from_slice(&message[MEME_TOKEN_ADDRESS_OFFSET..RECEIPT_ADDRESS_OFFSET]);
+    meme_addr
 }
 
-pub fn compose_msg(message: &[u8]) -> Option<Vec<u8>> {
-    if message.len() > COMPOSE_MSG_OFFSET {
-        Some(message[COMPOSE_MSG_OFFSET..].to_vec())
-    } else {
-        None
-    }
+pub fn get_receipt_addr(message: &[u8]) -> [u8; 32] {
+    let mut receipt_addr = [0; 32];
+    receipt_addr.copy_from_slice(&message[RECEIPT_ADDRESS_OFFSET..SOL_AMOUNT_OFFSET]);
+    receipt_addr
+}
+
+pub fn get_sol_amount(message: &[u8]) -> u64 {
+    let mut sol_amount = [0; 8];
+    sol_amount.copy_from_slice(&message[SOL_AMOUNT_OFFSET..TOKEN_AMOUNT_OFFSET]);
+    u64::from_be_bytes(sol_amount)
+}
+
+pub fn get_token_amount(message: &[u8]) -> u64 {
+    let mut token_amount = [0; 8];
+    token_amount.copy_from_slice(&message[TOKEN_AMOUNT_OFFSET..]);
+    u64::from_be_bytes(token_amount)
 }
