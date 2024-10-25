@@ -13,12 +13,12 @@ export const buy = async (
     bondingCurve: PublicKey,
     associtedBondingCurve: PublicKey,
     associtedUserTokenAccount: PublicKey,
-) => {    
+) => {
     const tx = await program.methods.buy(
       buyAmount,
       maxSolAmount
     ).accounts({
-      tokenMint, 
+      tokenMint,
       mintAuthority,
       config,
       bondingCurve,

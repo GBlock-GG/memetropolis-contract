@@ -5,7 +5,6 @@ pub mod state;
 pub mod utils;
 mod events;
 mod errors;
-pub mod compose_msg_codec;
 pub mod msg_codec;
 
 use instructions::*;
@@ -13,20 +12,21 @@ use state::*;
 use utils::*;
 use events::*;
 use errors::*;
-use oapp::{
-  endpoint::{MessagingFee, MessagingReceipt},
-  LzReceiveParams,
-};
+// use oapp::{
+//   endpoint::{MessagingFee, MessagingReceipt},
+  // LzReceiveParams,
+// };
 
 
-declare_id!("ABGjHbpm7gcnpYuNVUHEiXwKFm8RWjYfgJCvdscxUn2h");
+declare_id!("BmgN6isDTS96BaY7fv82EQ7VHoeGZjvLMnLykfLrLeJN");
 
-pub const OFT_SEED: &[u8] = b"Oft";
+// pub const OFT_SEED: &[u8] = b"Oft";
+pub const OAPP_SEED: &[u8] = b"OApp";
 pub const PEER_SEED: &[u8] = b"Peer";
 pub const ENFORCED_OPTIONS_SEED: &[u8] = b"EnforcedOptions";
 pub const LZ_RECEIVE_TYPES_SEED: &[u8] = oapp::LZ_RECEIVE_TYPES_SEED;
 
-pub const SHARED_DECIMALS:u8 = 6;
+// pub const SHARED_DECIMALS:u8 = 6;
 pub const MAX_SUPPLY:u64 = 1000_000_000_000_000;
 pub const INIT_SUPPLY:u64 = 200_000_000_000_000;
 
@@ -34,15 +34,19 @@ pub const INIT_SUPPLY:u64 = 200_000_000_000_000;
 pub mod pump_fun {
   use super::*;
 
-  pub fn create_config(mut ctx: Context<CreateConfig>, params: CreateConfigParams) -> Result<()> {
-    CreateConfig::apply(&mut ctx, &params)
+  pub fn create_global_config(mut ctx: Context<CreateGlobalConfig>, params: CreateGlobalConfigParams) -> Result<()> {
+    CreateGlobalConfig::apply(&mut ctx, &params)
   }
 
-  pub fn update_config(mut ctx: Context<UpdateConfig>, params: UpdateConfigParams) -> Result<()> {
-    UpdateConfig::apply(&mut ctx, &params)
+  pub fn update_global_config(mut ctx: Context<UpdateGlobalConfig>, params: UpdateGlobalConfigParams) -> Result<()> {
+    UpdateGlobalConfig::apply(&mut ctx, &params)
   }
 
-  // create meme token with OFT
+  pub fn init_oapp(mut ctx: Context<InitOApp>, params: InitOAppParams) -> Result<()> {
+    InitOApp::apply(&mut ctx, &params)
+  }
+
+  // create meme token
   pub fn create_token(
       mut ctx: Context<CreateToken>,
       params: CreateTokenParams,
@@ -67,11 +71,11 @@ pub mod pump_fun {
   }
   // OFT
   // ============================== Admin ==============================
-  pub fn transfer_admin(
-    mut ctx: Context<TransferAdmin>,
-    params: TransferAdminParams,
+  pub fn transfer_oapp_admin(
+    mut ctx: Context<TransferOAppAdmin>,
+    params: TransferOAppAdminParams,
   ) -> Result<()> {
-      TransferAdmin::apply(&mut ctx, &params)
+    TransferOAppAdmin::apply(&mut ctx, &params)
   }
 
   pub fn set_peer(mut ctx: Context<SetPeer>, params: SetPeerParams) -> Result<()> {
@@ -86,19 +90,6 @@ pub mod pump_fun {
   }
 
   // ============================== Public ==============================
-
-  pub fn quote_oft(ctx: Context<QuoteOft>, params: QuoteOftParams) -> Result<QuoteOftResult> {
-    QuoteOft::apply(&ctx, &params)
-  }
-
-  pub fn quote(ctx: Context<Quote>, params: QuoteParams) -> Result<MessagingFee> {
-      Quote::apply(&ctx, &params)
-  }
-
-  pub fn send(mut ctx: Context<Send>, params: SendParams) -> Result<MessagingReceipt> {
-      Send::apply(&mut ctx, &params)
-  }
-
   pub fn lz_receive(mut ctx: Context<LzReceive>, params: LzReceiveParams) -> Result<()> {
       LzReceive::apply(&mut ctx, &params)
   }
@@ -108,13 +99,6 @@ pub mod pump_fun {
       params: LzReceiveParams,
   ) -> Result<Vec<oapp::endpoint_cpi::LzAccount>> {
       LzReceiveTypes::apply(&ctx, &params)
-  }
-
-  pub fn set_rate_limit(
-      mut ctx: Context<SetRateLimit>,
-      params: SetRateLimitParams,
-  ) -> Result<()> {
-      SetRateLimit::apply(&mut ctx, &params)
   }
 
 }

@@ -16,7 +16,7 @@ pub struct Withdraw<'info> {
 
   #[account(
     seeds = [
-      CONFIG_SEED.as_bytes(),
+      CONFIG_SEED,
     ],
     bump = global_config.bump
   )]
@@ -32,7 +32,7 @@ pub struct Withdraw<'info> {
   #[account(
       mut,
       seeds = [
-      BONDING_CURVE_SEED.as_bytes(),
+      BONDING_CURVE_SEED,
       token_mint.key().as_ref()
       ],
       bump,
@@ -73,7 +73,7 @@ impl Withdraw<'_> {
     //transfer token from vault to user
     let token_mint = ctx.accounts.token_mint.key();
     let vault_seeds = &[
-        BONDING_CURVE_SEED.as_bytes(),
+        BONDING_CURVE_SEED,
         token_mint.as_ref(),
         &[ctx.bumps.bonding_curve],
     ];

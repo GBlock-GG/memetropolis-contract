@@ -2,8 +2,8 @@ use std::ops::DerefMut;
 use crate::*;
 
 #[derive(Accounts)]
-pub struct CreateConfig<'info> {
-  /// Admin address
+pub struct CreateGlobalConfig<'info> {
+  /// authority to withdraw from bonding_curve_account
   #[account(
     mut,
   )]
@@ -12,7 +12,7 @@ pub struct CreateConfig<'info> {
   #[account(
     init,
     seeds=[
-      CONFIG_SEED.as_bytes(),
+      CONFIG_SEED,
     ],
     bump,
     payer = payer,
@@ -22,8 +22,8 @@ pub struct CreateConfig<'info> {
 
   pub system_program: Program<'info, System>,
 }
-impl CreateConfig<'_> {
-  pub fn apply(ctx: &mut Context<CreateConfig>, params: &CreateConfigParams) -> Result<()> {
+impl CreateGlobalConfig<'_> {
+  pub fn apply(ctx: &mut Context<CreateGlobalConfig>, params: &CreateGlobalConfigParams) -> Result<()> {
     let config = ctx.accounts.global_config.deref_mut();
     config.admin = params.admin;
     config.fee_recipient = params.fee_recipient;
@@ -34,7 +34,7 @@ impl CreateConfig<'_> {
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
-pub struct CreateConfigParams {
+pub struct CreateGlobalConfigParams {
   pub fee_recipient: Pubkey,
   pub admin: Pubkey,
   pub fee_rate: u32,

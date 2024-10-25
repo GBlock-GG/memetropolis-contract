@@ -30,5 +30,5 @@ verify-bnbToken:
 		--etherscan-api-key ${BNB_TEST_ETHERSCAN_API_KEY} \
 		--verifier-url ${BNB_TEST_ETHERSCAN_API_URL} \
 		--constructor-args-path constructor-args/Token.txt \
-		0xb0f0842C5C498544B6BEfB32b785244Ff301fbFa \
+		0xF37Ca447b60125074e03Ed26772cAEDDE6FEEA3e \
 		src/Token.sol:Token

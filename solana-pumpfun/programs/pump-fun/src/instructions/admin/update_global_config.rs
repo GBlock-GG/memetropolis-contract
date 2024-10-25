@@ -2,7 +2,7 @@ use std::ops::DerefMut;
 use crate::*;
 
 #[derive(Accounts)]
-pub struct UpdateConfig<'info> {
+pub struct UpdateGlobalConfig<'info> {
     /// Admin address
   #[account(
     mut,
@@ -12,15 +12,15 @@ pub struct UpdateConfig<'info> {
 
   #[account(
     seeds=[
-      CONFIG_SEED.as_bytes(),
+      CONFIG_SEED,
     ],
     bump = global_config.bump
   )]
   pub global_config: Account<'info, GlobalConfig>,
 }
 
-impl UpdateConfig<'_> {
-  pub fn apply(ctx: &mut Context<UpdateConfig>, params: &UpdateConfigParams) -> Result<()> {
+impl UpdateGlobalConfig<'_> {
+  pub fn apply(ctx: &mut Context<UpdateGlobalConfig>, params: &UpdateGlobalConfigParams) -> Result<()> {
     let config = ctx.accounts.global_config.deref_mut();
 
     if params.fee_recipient.is_some() {
@@ -34,7 +34,7 @@ impl UpdateConfig<'_> {
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
-pub struct UpdateConfigParams {
+pub struct UpdateGlobalConfigParams {
   pub fee_recipient: Option<Pubkey>,
   pub fee_rate: Option<u32>,
 }
