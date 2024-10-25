@@ -86,8 +86,8 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
     /// @notice Allows users to buy meme tokens using ETH.
     /// @param memeTokenAddress The address of the meme token contract.
     /// @param ethAmount The Eth amount.
-    function buyCrosschainMemetoken(uint32 _dstEid, address memeTokenAddress, uint128 ethAmount) external payable {
-        bytes memory message = abi.encode(BUY_TYPE, memeTokenAddress, msg.sender, ethAmount, 0);
+    function buyCrosschainMemetoken(uint32 _dstEid, bytes32 memeTokenAddress, bytes32 recipientAddress, uint128 ethAmount) external payable {
+        bytes memory message = abi.encodePacked(BUY_TYPE, memeTokenAddress, recipientAddress, ethAmount, uint256(0));
         bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(200000, ethAmount);
         _lzSend(
             _dstEid,
@@ -104,17 +104,13 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
         address memeTokenAddress,
         uint128 ethAmount
     ) external view returns (uint256 nativeFee, uint256 lzTokenFee) {
-        bytes memory message = abi.encode(BUY_TYPE, memeTokenAddress, msg.sender, ethAmount, 0);
-        bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(200000, ethAmount);
-        MessagingFee memory fee = _quote(_dstEid, message, options, false);
-        return (fee.nativeFee, fee.lzTokenFee);
+        bytes memory message = abi.encodePacked(BUY_TYPE, memeTokenAddress, recipientAddress, ethAmount, uint256(0));
     }
-
     /// @notice Allows users to buy meme tokens using ETH.
     /// @param memeTokenAddress The address of the meme token contract.
     /// @param tokenQty The Token amount to sell.
-    function sellCrosschainMemetoken(uint32 _dstEid, address memeTokenAddress, uint256 tokenQty) external payable {
-        bytes memory message = abi.encode(SELL_TYPE, memeTokenAddress, msg.sender, 0, tokenQty);
+    function sellCrosschainMemetoken(uint32 _dstEid, bytes32 memeTokenAddress, bytes32 recipientAddress, uint256 tokenQty) external payable {
+        bytes memory message = abi.encodePacked(SELL_TYPE, memeTokenAddress, recipientAddress, uint128(0), tokenQty);
         bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(200000, 0);
         _lzSend(
             _dstEid,
@@ -131,11 +127,44 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
         address memeTokenAddress,
         uint256 tokenQty
     ) external view returns (uint256 nativeFee, uint256 lzTokenFee) {
-        bytes memory message = abi.encode(SELL_TYPE, memeTokenAddress, msg.sender, 0, tokenQty);
+        bytes memory message = abi.encodePacked(SELL_TYPE, memeTokenAddress, recipientAddress, uint128(0), tokenQty);
         bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(200000, 0);
         
         MessagingFee memory fee = _quote(_dstEid, message, options, false);
         return (fee.nativeFee, fee.lzTokenFee);
+    }
+
+    function decodeMessage(bytes memory message) internal pure returns (uint8 msgType, bytes32 memeTokenAddressBytes, bytes32 recipientAddressBytes, uint256 ethAmount, uint256 tokenQty) {
+        uint256 index = 0;
+
+        // Decode the msgType (BUY_TYPE or SELL_TYPE) from the first byte
+        msgType = uint8(message[index]);
+        index += 1;
+
+        // Use assembly to load 32 bytes from memory starting at position `index`
+        assembly {
+            memeTokenAddressBytes := mload(add(message, add(0x20, index)))
+        }
+        index += 32;
+
+        // Decode recipientAddressBytes using assembly
+        assembly {
+            recipientAddressBytes := mload(add(message, add(0x20, index)))
+        }
+        index += 32;
+
+        // Decode ethAmount (uint128, 16 bytes), but load 32 bytes and cast to uint128
+        uint128 ethAmount128;
+        assembly {
+            ethAmount128 := mload(add(message, add(0x20, index)))
+        }
+        ethAmount = uint256(ethAmount128); // Cast uint128 to uint256
+        index += 16;
+
+        // Decode tokenQty (uint256, 32 bytes)
+        assembly {
+            tokenQty := mload(add(message, add(0x20, index)))
+        }
     }
 
     function _lzReceive(
@@ -146,7 +175,9 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
         bytes calldata  // Any extra data or options to trigger on receipt.
     ) internal override {
         // Decode the payload to get the message
-        (uint8 msgType, address memeTokenAddress, address _to, uint256 ethAmount, uint256 tokenQty) = abi.decode(payload, (uint8, address, address, uint256, uint256));
+        (uint8 msgType, bytes32 memeTokenAddressBytes, bytes32 _toBytes, uint256 ethAmount, uint256 tokenQty) = decodeMessage(payload);
+        address memeTokenAddress = address(uint160(uint256(memeTokenAddressBytes)));
+        address _to = address(uint160(uint256(_toBytes)));
 
         if (msgType == BUY_TYPE) {
             if (msg.value < ethAmount)
