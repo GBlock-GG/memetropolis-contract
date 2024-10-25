@@ -38,11 +38,11 @@ pub struct CreateToken<'info> {
   pub bonding_curve: UncheckedAccount<'info>,
 
   #[account(
-    // init,
-    mut,
+    init,
+    // mut,
     associated_token::mint = token_mint,
     associated_token::authority = bonding_curve,
-    // payer = payer,
+    payer = payer,
     token::token_program = token_program,
   )]
   pub associted_bonding_curve: Box<InterfaceAccount<'info, TokenAccount>>,
@@ -133,7 +133,7 @@ pub struct CreateTokenParams {
   pub name: Vec<u8>,
   pub symbol: Vec<u8>,
   pub uri: Vec<u8>,
-  pub endpoint_program: Option<Pubkey>,
+  // pub endpoint_program: Option<Pubkey>,
 }
 
 

@@ -1,5 +1,5 @@
 use crate::*;
-use anchor_spl::token_interface::{Mint, TokenInterface};
+use anchor_spl::token_interface::TokenInterface;
 
 /// This instruction should always be in the same transaction as InitializeMint.
 /// Otherwise, it is possible for your settings to be front-run by another transaction.
@@ -25,7 +25,7 @@ pub struct InitOApp<'info> {
         bump
     )]
     pub lz_receive_types_accounts: Account<'info, LzReceiveTypesAccounts>,
-    pub token_program: Interface<'info, TokenInterface>,
+    // pub token_program: Interface<'info, TokenInterface>,
     pub system_program: Program<'info, System>,
 }
 

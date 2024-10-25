@@ -7,7 +7,7 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-pump_fun = "9evaFentwXrnSeawZsUzfjZsZKx5r1tFBB8jYkBrLosj"
+pump_fun = "BmgN6isDTS96BaY7fv82EQ7VHoeGZjvLMnLykfLrLeJN"
 
 [registry]
 url = "https://api.apr.dev"

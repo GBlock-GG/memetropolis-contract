@@ -5,7 +5,6 @@ pub mod state;
 pub mod utils;
 mod events;
 mod errors;
-pub mod compose_msg_codec;
 pub mod msg_codec;
 
 use instructions::*;
@@ -13,13 +12,13 @@ use state::*;
 use utils::*;
 use events::*;
 use errors::*;
-use oapp::{
-  endpoint::{MessagingFee, MessagingReceipt},
+// use oapp::{
+//   endpoint::{MessagingFee, MessagingReceipt},
   // LzReceiveParams,
-};
+// };
 
 
-declare_id!("9evaFentwXrnSeawZsUzfjZsZKx5r1tFBB8jYkBrLosj");
+declare_id!("BmgN6isDTS96BaY7fv82EQ7VHoeGZjvLMnLykfLrLeJN");
 
 // pub const OFT_SEED: &[u8] = b"Oft";
 pub const OAPP_SEED: &[u8] = b"OApp";
@@ -91,19 +90,6 @@ pub mod pump_fun {
   }
 
   // ============================== Public ==============================
-
-  // pub fn quote_oft(ctx: Context<QuoteOft>, params: QuoteOftParams) -> Result<QuoteOftResult> {
-  //   QuoteOft::apply(&ctx, &params)
-  // }
-
-  pub fn quote(ctx: Context<Quote>, params: QuoteParams) -> Result<MessagingFee> {
-      Quote::apply(&ctx, &params)
-  }
-
-  pub fn send(mut ctx: Context<Send>, params: SendParams) -> Result<MessagingReceipt> {
-      Send::apply(&mut ctx, &params)
-  }
-
   pub fn lz_receive(mut ctx: Context<LzReceive>, params: LzReceiveParams) -> Result<()> {
       LzReceive::apply(&mut ctx, &params)
   }
@@ -113,13 +99,6 @@ pub mod pump_fun {
       params: LzReceiveParams,
   ) -> Result<Vec<oapp::endpoint_cpi::LzAccount>> {
       LzReceiveTypes::apply(&ctx, &params)
-  }
-
-  pub fn set_rate_limit(
-      mut ctx: Context<SetRateLimit>,
-      params: SetRateLimitParams,
-  ) -> Result<()> {
-      SetRateLimit::apply(&mut ctx, &params)
   }
 
 }
