@@ -2,7 +2,7 @@
 const MEME_TOKEN_ADDRESS_OFFSET: usize = 1;
 const RECEIPT_ADDRESS_OFFSET: usize = 33;
 const SOL_AMOUNT_OFFSET: usize = 65;
-const TOKEN_AMOUNT_OFFSET: usize = 73;
+const TOKEN_AMOUNT_OFFSET: usize = 81;
 
 // pub fn encode(
 //     send_to: [u8; 32],

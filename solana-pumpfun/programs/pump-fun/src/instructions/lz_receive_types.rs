@@ -81,7 +81,7 @@ impl LzReceiveTypes<'_> {
         accounts.extend_from_slice(&[
             LzAccount { pubkey: token_mint, is_signer: false, is_writable: false }, // 3
             LzAccount { pubkey: to_address, is_signer: false, is_writable: false }, // 4
-            LzAccount { pubkey: bonding_curve, is_signer: false, is_writable: false }, // 5
+            LzAccount { pubkey: bonding_curve, is_signer: false, is_writable: true }, // 5
             LzAccount { pubkey: associted_bonding_curve, is_signer: false, is_writable: true}, // 6
             LzAccount { pubkey: associted_user_token_account, is_signer: false, is_writable: true}, // 7
             LzAccount { pubkey: TOKEN_ID, is_signer: false, is_writable: false }, // 8

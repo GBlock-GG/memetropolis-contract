@@ -18,7 +18,7 @@ use errors::*;
 // };
 
 
-declare_id!("BmgN6isDTS96BaY7fv82EQ7VHoeGZjvLMnLykfLrLeJN");
+declare_id!("5Cn1DtzNYSVddUVFEC4NWvkbUemZDxHdMnM6SL4zreei");
 
 // pub const OFT_SEED: &[u8] = b"Oft";
 pub const OAPP_SEED: &[u8] = b"OApp";
