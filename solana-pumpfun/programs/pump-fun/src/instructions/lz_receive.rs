@@ -41,6 +41,7 @@ pub struct LzReceive<'info> {
 
     /// CHECK: token vault address
     #[account(
+        mut,
         seeds = [
             BONDING_CURVE_SEED,
             token_mint.key().as_ref()
@@ -103,7 +104,7 @@ impl LzReceive<'_> {
             );
             let current_supply =
                 MAX_SUPPLY - ctx.accounts.associted_bonding_curve.amount;
-            let sol = sol_amount - 1500000;
+            let sol = sol_amount - 4000000;  //fee to create tokenAccount
             let token_amount_to_purchased = calculate_token_amount(current_supply, sol, decimals);
             let available_qty =
                 ctx.accounts.associted_bonding_curve.amount - INIT_SUPPLY;
