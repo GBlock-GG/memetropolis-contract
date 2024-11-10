@@ -85,6 +85,7 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
 
     /// @notice Allows users to buy meme tokens using ETH.
     /// @param memeTokenAddress The address of the meme token contract.
+    /// @param recipientAddress The recipient address.
     /// @param ethAmount The Eth amount.
     function buyCrosschainMemetoken(uint32 _dstEid, bytes32 memeTokenAddress, bytes32 recipientAddress, uint128 ethAmount) external payable {
         bytes memory message = abi.encodePacked(BUY_TYPE, memeTokenAddress, recipientAddress, ethAmount, uint256(0));
@@ -101,13 +102,19 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
     /// @notice Use this function to estimate fees for your cross-chain buyCrosschainMemetoken()
     function quoteBuyCrossChainMemetoken(
         uint32 _dstEid,
-        address memeTokenAddress,
+        bytes32 memeTokenAddress,
+        bytes32 recipientAddress,
         uint128 ethAmount
     ) external view returns (uint256 nativeFee, uint256 lzTokenFee) {
         bytes memory message = abi.encodePacked(BUY_TYPE, memeTokenAddress, recipientAddress, ethAmount, uint256(0));
+        bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(200000, ethAmount);
+        MessagingFee memory fee = _quote(_dstEid, message, options, false);
+        return (fee.nativeFee, fee.lzTokenFee);
     }
+
     /// @notice Allows users to buy meme tokens using ETH.
     /// @param memeTokenAddress The address of the meme token contract.
+    /// @param recipientAddress The recipient address.
     /// @param tokenQty The Token amount to sell.
     function sellCrosschainMemetoken(uint32 _dstEid, bytes32 memeTokenAddress, bytes32 recipientAddress, uint256 tokenQty) external payable {
         bytes memory message = abi.encodePacked(SELL_TYPE, memeTokenAddress, recipientAddress, uint128(0), tokenQty);
@@ -124,7 +131,8 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
     /// @notice Use this function to estimate fees for your cross-chain buyCrosschainMemetoken()
     function quoteSellCrossChainMemetoken(
         uint32 _dstEid,
-        address memeTokenAddress,
+        bytes32 memeTokenAddress,
+        bytes32 recipientAddress,
         uint256 tokenQty
     ) external view returns (uint256 nativeFee, uint256 lzTokenFee) {
         bytes memory message = abi.encodePacked(SELL_TYPE, memeTokenAddress, recipientAddress, uint128(0), tokenQty);
