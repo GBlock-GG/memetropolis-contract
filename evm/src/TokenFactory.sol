@@ -164,7 +164,7 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
         // Decode ethAmount (uint128, 16 bytes), but load 32 bytes and cast to uint128
         uint128 ethAmount128;
         assembly {
-            ethAmount128 := mload(add(message, add(0x20, index)))
+            ethAmount128 := mload(add(message, add(0x10, index)))
         }
         ethAmount = uint256(ethAmount128); // Cast uint128 to uint256
         index += 16;
