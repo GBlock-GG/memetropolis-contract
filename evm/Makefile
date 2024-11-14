@@ -11,6 +11,12 @@ deploy-bnbTestnet:
 deploy-baseTestnet:
 	$(MAKE) deploy-base RPC_URL=base_sepolia EXTRA_FLAGS="--verify --etherscan-api-key ${BASE_ETHERSCAN_API_KEY} --verifier-url ${BASE_SEPOLIA_ETHERSCAN_API_URL} --slow"
 
+deploy-arbitrumTestnet:
+	$(MAKE) deploy-arbitrum RPC_URL=arbitrum_sepolia EXTRA_FLAGS="--verify --etherscan-api-key ${ARBITRUM_ETHERSCAN_API_KEY} --verifier-url ${ARBITRUM_SEPOLIA_ETHERSCAN_API_URL} --slow"
+
+deploy-ethTestnet:
+	$(MAKE) deploy-eth RPC_URL=eth_sepolia EXTRA_FLAGS="--verify --etherscan-api-key ${ETH_ETHERSCAN_API_KEY} --verifier-url ${ETH_SEPOLIA_ETHERSCAN_API_URL} --slow"
+
 deploy-base:
 	@echo "Running deploy '$(RPC_URL)'"
 	@rm -rf out && \
@@ -21,6 +27,18 @@ deploy-bnb:
 	@echo "Running deploy '$(RPC_URL)'"
 	@rm -rf out && \
 	forge script script/bnb/DeployTokenFactory.s.sol --rpc-url $(RPC_URL) \
+		--private-key $(DEPLOYER_PRIVATE_KEY) --broadcast $(EXTRA_FLAGS) -vvvv
+
+deploy-arbitrum:
+	@echo "Running deploy '$(RPC_URL)'"
+	@rm -rf out && \
+	forge script script/arbitrum/DeployTokenFactory.s.sol --rpc-url $(RPC_URL) \
+		--private-key $(DEPLOYER_PRIVATE_KEY) --broadcast $(EXTRA_FLAGS) -vvvv
+
+deploy-eth:
+	@echo "Running deploy '$(RPC_URL)'"
+	@rm -rf out && \
+	forge script script/eth/DeployTokenFactory.s.sol --rpc-url $(RPC_URL) \
 		--private-key $(DEPLOYER_PRIVATE_KEY) --broadcast $(EXTRA_FLAGS) -vvvv
 
 verify-bnbToken:
