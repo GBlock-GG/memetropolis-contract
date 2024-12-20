@@ -13,11 +13,14 @@ contract TokenFactoryTest is TestHelperOz5 {
     TokenFactory public aFactory;
     TokenFactory public bFactory;
     uint constant DECIMALS = 10 ** 18;
+    uint constant MAX_SUPPLY = 1000000 * DECIMALS;
     uint TOKEN_CREATOR_BONUS = 0.12 ether;
     uint PLATFORM_FEE = 0.6 ether;
     uint INITIAL_PRICE = 2 * 10 ** 12;
     address constant LZ_ENDPOINT_V2_ADDRESS = 0x6EDCE65403992e310A62460808c4b910D972f10f; // 0x1a44076050125825900e736c501f859c50fE728c
-
+    address constant UNISWAP_V2_FACTORY_ADDRESS = 0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6;
+    address constant UNISWAP_V2_ROUTER_ADDRESS = 0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24;
+    
     uint32 aEid = 1;
     uint32 bEid = 2;
 
@@ -34,7 +37,9 @@ contract TokenFactoryTest is TestHelperOz5 {
             TOKEN_CREATOR_BONUS,
             PLATFORM_FEE,
             LZ_ENDPOINT_V2_ADDRESS,
-            INITIAL_PRICE
+            INITIAL_PRICE,
+            UNISWAP_V2_FACTORY_ADDRESS,
+            UNISWAP_V2_ROUTER_ADDRESS
         );
 
         aFactory = new TokenFactory(
@@ -42,26 +47,30 @@ contract TokenFactoryTest is TestHelperOz5 {
             TOKEN_CREATOR_BONUS,
             PLATFORM_FEE,
             endpoints[1],
-            INITIAL_PRICE
+            INITIAL_PRICE,
+            UNISWAP_V2_FACTORY_ADDRESS,
+            UNISWAP_V2_ROUTER_ADDRESS
         );
         bFactory = new TokenFactory(
             address(this),
             TOKEN_CREATOR_BONUS,
             PLATFORM_FEE,
             endpoints[2],
-            INITIAL_PRICE
+            INITIAL_PRICE,
+            UNISWAP_V2_FACTORY_ADDRESS,
+            UNISWAP_V2_ROUTER_ADDRESS
         );
         aFactory.setPeer(bEid, bytes32(uint256(uint160(address(bFactory)))));
         bFactory.setPeer(aEid, bytes32(uint256(uint160(address(aFactory)))));
     }
 
     function test_BuyCrosschainMemetoken() public {
-        address tokenAddress = bFactory.createMemeToken("Test", "TEST", "img://img.png", "hello there");
+        address tokenAddress = bFactory.createMemeToken("Test", "TEST", "img://img.png", "hello there", 0, 0, 0, 0, 0, 0, 0, 0);
         console.log("Init token balance: ", Token(tokenAddress).balanceOf(address(this)));
 
         uint128 ethAmount = 10**17;
-        (uint256 nativeFee, ) = aFactory.quoteBuyCrossChainMemetoken(2, tokenAddress, ethAmount);
-        aFactory.buyCrosschainMemetoken{ value: nativeFee }(2, tokenAddress, ethAmount);
+        (uint256 nativeFee, ) = aFactory.quoteBuyCrossChainMemetoken(2, bytes32(uint256(uint160(address(tokenAddress)))), bytes32(uint256(uint160(address(this)))), ethAmount);
+        aFactory.buyCrosschainMemetoken{ value: nativeFee }(2, bytes32(uint256(uint160(address(tokenAddress)))), bytes32(uint256(uint160(address(this)))), ethAmount);
 
         // verify packet to bFactory manually
         verifyPackets(bEid, addressToBytes32(address(bFactory)));
@@ -71,7 +80,7 @@ contract TokenFactoryTest is TestHelperOz5 {
 
     function test_SellCrosschainMemetoken() public {
         vm.prank(userA);
-        address tokenAddress = bFactory.createMemeToken("Test", "TEST", "img://img.png", "hello there");
+        address tokenAddress = bFactory.createMemeToken("Test", "TEST", "img://img.png", "hello there", 0, 0, 0, 0, 0, 0, 0, 0);
         console.log("Init token balance: ", Token(tokenAddress).balanceOf(address(bFactory)));
 
         Token token = Token(tokenAddress);
@@ -89,8 +98,8 @@ contract TokenFactoryTest is TestHelperOz5 {
         
         uint prevEthBalance = address(this).balance;
 
-        (uint256 nativeFee, ) = aFactory.quoteSellCrossChainMemetoken(2, tokenAddress, sellTokenQty);
-        aFactory.sellCrosschainMemetoken{ value: nativeFee }(2, tokenAddress, sellTokenQty);
+        (uint256 nativeFee, ) = aFactory.quoteSellCrossChainMemetoken(2, bytes32(uint256(uint160(address(tokenAddress)))), bytes32(uint256(uint160(address(this)))), sellTokenQty);
+        aFactory.sellCrosschainMemetoken{ value: nativeFee }(2, bytes32(uint256(uint160(address(tokenAddress)))), bytes32(uint256(uint160(address(this)))), sellTokenQty);
 
         // verify packet to bFactory manually
         verifyPackets(bEid, addressToBytes32(address(bFactory)));
@@ -100,14 +109,14 @@ contract TokenFactoryTest is TestHelperOz5 {
     }
 
     function test_CreateToken() public {
-        address tokenAddress = factory.createMemeToken("Test", "TEST", "img://img.png", "hello there");
+        address tokenAddress = factory.createMemeToken("Test", "TEST", "img://img.png", "hello there", 0, 0, 0, 0, 0, 0, 0, 0);
         Token token = Token(tokenAddress);
 
-        assertEq(token.balanceOf(address(factory)), factory.MAX_SUPPLY());
+        assertEq(token.balanceOf(address(factory)), MAX_SUPPLY);
     }
 
     function test_BuyMemeToken() public {
-        address tokenAddress = factory.createMemeToken("Test", "TEST", "img://img.png", "hello there");
+        address tokenAddress = factory.createMemeToken("Test", "TEST", "img://img.png", "hello there", 0, 0, 0, 0, 0, 0, 0, 0);
         Token token = Token(tokenAddress);
         
         // Buy 20K tokens initially
@@ -133,7 +142,7 @@ contract TokenFactoryTest is TestHelperOz5 {
         uint depositAmount = 10 ether;
         vm.deal(address(this), depositAmount);
         
-        address tokenAddress = factory.createMemeToken("Test", "TEST", "img://img.png", "hello there");
+        address tokenAddress = factory.createMemeToken("Test", "TEST", "img://img.png", "hello there", 0, 0, 0, 0, 0, 0, 0, 0);
         Token token = Token(tokenAddress);
         
         // Buy token equivalent to 1 ETH
@@ -149,7 +158,7 @@ contract TokenFactoryTest is TestHelperOz5 {
         uint depositAmount = 30 ether;
         vm.deal(address(this), depositAmount);
 
-        address tokenAddress = factory.createMemeToken("Test", "TEST", "img://img.png", "hello there");
+        address tokenAddress = factory.createMemeToken("Test", "TEST", "img://img.png", "hello there", 0, 0, 0, 0, 0, 0, 0, 0);
         Token token = Token(tokenAddress);
         
         // Buy 800K tokens
@@ -167,7 +176,7 @@ contract TokenFactoryTest is TestHelperOz5 {
     }
 
     function test_SellMemeToken() public {
-        address tokenAddress = factory.createMemeToken("Test", "TEST", "img://img.png", "hello there");
+        address tokenAddress = factory.createMemeToken("Test", "TEST", "img://img.png", "hello there", 0, 0, 0, 0, 0, 0, 0, 0);
         Token token = Token(tokenAddress);
         
         // Buy 20K tokens
@@ -191,7 +200,7 @@ contract TokenFactoryTest is TestHelperOz5 {
         uint depositAmount = 10 ether;
         vm.deal(address(this), depositAmount);
 
-        address tokenAddress = factory.createMemeToken("Test", "TEST", "img://img.png", "hello there");
+        address tokenAddress = factory.createMemeToken("Test", "TEST", "img://img.png", "hello there", 0, 0, 0, 0, 0, 0, 0, 0);
         Token token = Token(tokenAddress);
         
         // Buy 20K tokens initially

@@ -3,6 +3,8 @@ src = "src"
 out = "out"
 test = 'test'
 via_ir = true
+optimizer = true
+optimizer_runs = 50
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
 
@@ -16,7 +18,11 @@ default_network = "http://127.0.0.1:8545"
 localhost = "http://127.0.0.1:8545"
 bnb_test = "${BNB_TEST_RPC_URL}"
 base_sepolia = "${BASE_SEPOLIA_RPC_URL}"
+arbitrum_sepolia = "${ARBITRUM_SEPOLIA_RPC_URL}"
+eth_sepolia = "${ETH_SEPOLIA_RPC_URL}"
 
 [etherscan]
 localhost = { key = "" , url="http://127.0.0.1:8545"}
 bnbTestnet = { key = "${BNB_TEST_ETHERSCAN_API_KEY}", url = "${BNB_TEST_ETHERSCAN_API_URL}", chain=8453 }
+arbitrumSepolia = { key = "${ARBITRUM_ETHERSCAN_API_KEY}", url = "${ARBITRUM_SEPOLIA_ETHERSCAN_API_URL}", chain=8453 }
+ethSepolia = { key = "${ETH_ETHERSCAN_API_KEY}", url = "${ETH_SEPOLIA_ETHERSCAN_API_URL}", chain=1 }

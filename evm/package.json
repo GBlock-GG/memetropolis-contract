@@ -7,6 +7,8 @@
     "deploy": "make deploy-local",
     "deploy:bnbTestnet": "make deploy-bnbTestnet",
     "deploy:baseTestnet": "make deploy-baseTestnet",
+    "deploy:arbitrumTestnet": "make deploy-arbitrumTestnet",
+    "deploy:ethTestnet": "make deploy-ethTestnet",
     "verify:bnbToken": "make verify-bnbToken"
   },
   "dependencies": {
