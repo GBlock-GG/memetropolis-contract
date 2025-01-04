@@ -27,8 +27,14 @@ pub const ENFORCED_OPTIONS_SEED: &[u8] = b"EnforcedOptions";
 pub const LZ_RECEIVE_TYPES_SEED: &[u8] = oapp::LZ_RECEIVE_TYPES_SEED;
 
 // pub const SHARED_DECIMALS:u8 = 6;
-pub const MAX_SUPPLY:u64 = 1000_000_000_000_000;
+pub const DEFAULT_MAX_SUPPLY:u64 = 1000_000_000_000_000;
 pub const INIT_SUPPLY:u64 = 200_000_000_000_000;
+pub const DEFAULT_K:f64 = 0.000005;
+pub const DEFAULT_INITIAL_PRICE:u64 = 8000; // 0.000008  SOL / per token
+pub const DEFAULT_SALES_RATIO:u64 = 8000;
+pub const DEFAULT_RESERVED_RATIO:u64 = 0;
+pub const DEFAULT_LIQUIDITY_RATIO:u64 = 2000; //20%
+
 
 #[program]
 pub mod pump_fun {

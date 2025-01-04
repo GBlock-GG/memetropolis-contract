@@ -1,3 +1,5 @@
+use std::ops::DerefMut;
+
 use crate::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
@@ -35,7 +37,7 @@ pub struct CreateToken<'info> {
     space = 0,
     bump,
   )]
-  pub bonding_curve: UncheckedAccount<'info>,
+  pub bonding_curve: Box<Account<'info, BondingCurve>>,
 
   #[account(
     init,
@@ -47,14 +49,14 @@ pub struct CreateToken<'info> {
   )]
   pub associted_bonding_curve: Box<InterfaceAccount<'info, TokenAccount>>,
 
-  // #[account(
-  //   // init,
-  //   associated_token::mint = token_mint,
-  //   associated_token::authority = payer,
-  //   // payer = payer,
-  //   token::token_program = token_program,
-  // )]
-  // pub associted_user_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
+  #[account(
+    // init,
+    associated_token::mint = token_mint,
+    associated_token::authority = payer,
+    // payer = payer,
+    token::token_program = token_program,
+  )]
+  pub associted_user_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
   /// CHECK
   #[account(
@@ -106,7 +108,17 @@ impl CreateToken<'_> {
 
     create_metadata_accounts_v3(cpi_context, data_v2, false, true, None)?;
 
-    // mint_to  MAX_SUPPLY to bonding curve
+    let params_max_supply = if params.max_supply == 0 { DEFAULT_MAX_SUPPLY } else { params.max_supply };
+
+
+    let params_reserved_ratio = if params.reserved_ratio == 0 { DEFAULT_RESERVED_RATIO } else { params.reserved_ratio };
+    let mut reserved_supply = 0;
+    if params_reserved_ratio > 0 {
+      reserved_supply = params_reserved_ratio * params_max_supply / 10000;
+    }
+
+
+    // mint_to  MAX_SUPPLY-RESERVED_SUPPLY to bonding curve
     let cpi_accounts = MintTo {
       mint: ctx.accounts.token_mint.to_account_info(),
       to: ctx.accounts.associted_bonding_curve.to_account_info(),
@@ -114,14 +126,54 @@ impl CreateToken<'_> {
     };
     let cpi_program = ctx.accounts.token_program.to_account_info();
     let cpi_context = CpiContext::new(cpi_program, cpi_accounts);
-    mint_to(cpi_context.with_signer(&signer_seeds), MAX_SUPPLY)?;
+    mint_to(cpi_context.with_signer(&signer_seeds), params_max_supply - reserved_supply)?;
+
+    // mint_to RESERVED_SUPPLY to payer
+    if reserved_supply > 0 {
+      let cpi_accounts = MintTo {
+        mint: ctx.accounts.token_mint.to_account_info(),
+        to: ctx.accounts.associted_user_token_account.to_account_info(),
+        authority: ctx.accounts.bonding_curve.to_account_info(),
+      };
+      let cpi_program = ctx.accounts.token_program.to_account_info();
+      let cpi_context = CpiContext::new(cpi_program, cpi_accounts);
+      mint_to(cpi_context.with_signer(&signer_seeds),  reserved_supply)?;
+    }
+
+    let params_reserved_ratio = if params.reserved_ratio == 0 { DEFAULT_RESERVED_RATIO } else { params.reserved_ratio };
+
+    let bonding_curve = ctx.accounts.bonding_curve.deref_mut();
+    bonding_curve.bump = ctx.bumps.bonding_curve;
+    let params_k = if params.k == 0.0 { DEFAULT_K } else {params.k};
+    bonding_curve.k = params_k;
+
+    let params_initial_price = if params.initial_price == 0 { DEFAULT_INITIAL_PRICE } else { params.initial_price };
+    bonding_curve.initial_price = params_initial_price;
+
+    bonding_curve.max_supply = params_max_supply;
+
+    let params_sales_ratio = if params.sales_ratio == 0 { DEFAULT_SALES_RATIO } else { params.sales_ratio };
+    bonding_curve.sales_ratio = params_sales_ratio;
+    bonding_curve.reserved_ratio = params_reserved_ratio;
+    let params_liquidity_pool_ratio = if params.liquidity_pool_ratio == 0 { DEFAULT_LIQUIDITY_RATIO } else { params.liquidity_pool_ratio };
+    bonding_curve.liquidity_pool_ratio = params_liquidity_pool_ratio;
+    bonding_curve.launch_date = params.launch_date; //Clock::get()?.unix_timestamp.try_into().unwrap();
+    bonding_curve.maximum_per_user = params.maximum_per_user;
 
     emit!(CreateTokenEvent {
       creator: ctx.accounts.payer.key(),
       token_name: String::from_utf8(params.name.to_vec()).unwrap(),
       token_symbol: String::from_utf8(params.symbol.to_vec()).unwrap(),
       token_uri: String::from_utf8(params.uri.to_vec()).unwrap(),
-      mint: ctx.accounts.token_mint.key()
+      mint: ctx.accounts.token_mint.key(),
+      k: bonding_curve.k,
+      initial_price: bonding_curve.initial_price,
+      max_supply: bonding_curve.max_supply,
+      sales_ratio: bonding_curve.sales_ratio,
+      reserved_ratio: bonding_curve.reserved_ratio,
+
+      launch_date: bonding_curve.launch_date,
+      maximum_per_user: bonding_curve.maximum_per_user
     });
 
     Ok(())
@@ -133,6 +185,14 @@ pub struct CreateTokenParams {
   pub name: Vec<u8>,
   pub symbol: Vec<u8>,
   pub uri: Vec<u8>,
+  pub k: f64,
+  pub initial_price: u64,
+  pub max_supply: u64,
+  pub sales_ratio: u64,
+  pub reserved_ratio: u64,
+  pub liquidity_pool_ratio: u64, // 1%: 100
+  pub launch_date: u64,  //timestamp that can buy
+  pub maximum_per_user: u64, //lamports that user can buy max.
   // pub endpoint_program: Option<Pubkey>,
 }
 

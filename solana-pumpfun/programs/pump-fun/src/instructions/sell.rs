@@ -28,7 +28,7 @@ pub struct Sell<'info> {
     ],
     bump,
   )]
-  pub bonding_curve: UncheckedAccount<'info>,
+  pub bonding_curve: Box<Account<'info, BondingCurve>>,
 
   #[account(
     mut,
@@ -38,25 +38,41 @@ pub struct Sell<'info> {
   )]
     pub associted_bonding_curve: InterfaceAccount<'info, TokenAccount>,
 
-    #[account(
+  #[account(
     mut,
     associated_token::mint = token_mint,
     associated_token::authority = user,
     token::token_program = token_program,
   )]
-    pub associted_user_token_account: InterfaceAccount<'info, TokenAccount>,
+  pub associted_user_token_account: InterfaceAccount<'info, TokenAccount>,
 
-    #[account(mut)]
-    pub user: Signer<'info>,
-    pub associated_token_program: Program<'info, AssociatedToken>,
-    pub token_program: Program<'info, Token>,
-    pub system_program: Program<'info, System>,
+  #[account(
+    mut,
+    seeds = [
+      USER_CONF_SEED,
+      token_mint.key().as_ref(),
+      user.key().as_ref(),
+    ],
+    bump,
+  )]
+  pub user_conf:Box<Account<'info, UserConf>>,
+
+  #[account(mut)]
+  pub user: Signer<'info>,
+  pub associated_token_program: Program<'info, AssociatedToken>,
+  pub token_program: Program<'info, Token>,
+  pub system_program: Program<'info, System>,
 }
 impl Sell<'_> {
   pub fn apply(
     ctx: &mut Context<Sell>,
     amount: u64,         //sell token Amount
   ) -> Result<()> {
+    require!(
+      ctx.accounts.bonding_curve.launch_date <= Clock::get()?.unix_timestamp.try_into().unwrap(),
+      PumpFunError::TokenNotLaunched,
+    );
+
     let decimals = ctx.accounts.token_mint.decimals;
 
     // transfer token from user to vault
@@ -69,10 +85,12 @@ impl Sell<'_> {
         amount,
         ctx.accounts.token_mint.decimals,
     )?;
-    let current_supply =
-        MAX_SUPPLY - ctx.accounts.associted_bonding_curve.amount;
 
-    let sol_amount = calculate_cost(current_supply - amount, amount, decimals);
+    let token_total_supply = (1000 - ctx.accounts.bonding_curve.reserved_ratio) * ctx.accounts.bonding_curve.max_supply / 10000;
+    let current_supply =
+      token_total_supply - ctx.accounts.associted_bonding_curve.amount;
+
+    let sol_amount = calculate_cost(current_supply - amount, amount, decimals, ctx.accounts.bonding_curve.k, ctx.accounts.bonding_curve.initial_price);
 
     //transfer sol from vault to user
     transfer_sol_from_vault_to_user(
@@ -80,6 +98,7 @@ impl Sell<'_> {
         ctx.accounts.user.to_account_info(),
         sol_amount,
     )?;
+    ctx.accounts.user_conf.bought_amount -= sol_amount;
     emit!(SellEvent {
         mint: ctx.accounts.token_mint.key(),
         token_input: amount,

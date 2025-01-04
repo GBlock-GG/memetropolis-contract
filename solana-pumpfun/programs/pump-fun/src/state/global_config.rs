@@ -12,5 +12,6 @@ pub struct GlobalConfig {
     pub admin: Pubkey, //also authority to withdraw..
     pub fee_recipient: Pubkey,
     pub fee_rate: u32,
-    pub bump: u8
+    pub bump: u8,
+    pub is_initialized: bool,
 }

@@ -2,6 +2,10 @@ use anchor_lang::prelude::error_code;
 
 #[error_code]
 pub enum PumpFunError {
+  #[msg("Already Initialized")]
+  AlreadyInitialized,
+  #[msg("Token Not Launched")]
+  TokenNotLaunched,
   #[msg("Funding Already Raised")]
   AlreadyRaised,
   #[msg("Not enough available supply")]
@@ -11,7 +15,9 @@ pub enum PumpFunError {
   #[msg("BondingCurve: Input must be greater than zero")]
   InvalidInput,
   #[msg("Slippage Exceed")]
-  SlippageExceed
+  SlippageExceed,
+  #[msg("User Buy Limit Exceed")]
+  UserBuyLimitExceed,
 }
 
 #[error_code]

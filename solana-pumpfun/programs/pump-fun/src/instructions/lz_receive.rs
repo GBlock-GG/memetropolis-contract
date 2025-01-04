@@ -3,6 +3,7 @@ use anchor_spl::{
     associated_token::AssociatedToken,
     token_interface::{Mint, TokenAccount, TokenInterface},
 };
+use anchor_lang::prelude::Rent;
 use oapp::endpoint::{
     cpi::accounts::Clear,
     instructions::ClearParams,
@@ -48,7 +49,7 @@ pub struct LzReceive<'info> {
         ],
         bump,
     )]
-    pub bonding_curve: UncheckedAccount<'info>,
+    pub bonding_curve: Box<Account<'info, BondingCurve>>,
 
     #[account(
         mut,
@@ -66,7 +67,18 @@ pub struct LzReceive<'info> {
         token::token_program = token_program,
       )]
       pub associted_user_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
-
+    #[account(
+        init_if_needed,
+        seeds = [
+            USER_CONF_SEED,
+            token_mint.key().as_ref(),
+            to_address.key().as_ref(),
+        ],
+        payer = payer,
+        bump,
+        space = 8 + UserConf::INIT_SPACE
+    )]
+    pub user_conf: Box<Account<'info, UserConf>>,
     pub token_program: Interface<'info, TokenInterface>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
@@ -97,19 +109,35 @@ impl LzReceive<'_> {
         let sol_amount = msg_codec::get_sol_amount(&params.message);
         let decimals = 9;
         if is_buy {
-            // check to ensure funding goal is not met
             require!(
-                ctx.accounts.associted_bonding_curve.amount > INIT_SUPPLY,
+                ctx.accounts.bonding_curve.launch_date <= Clock::get()?.unix_timestamp.try_into().unwrap(),
+                PumpFunError::TokenNotLaunched,
+            );
+            // check to ensure funding goal is not met
+            let init_supply = ctx.accounts.bonding_curve.liquidity_pool_ratio * ctx.accounts.bonding_curve.max_supply / 10000;
+            require!(
+                ctx.accounts.associted_bonding_curve.amount > init_supply,
                 PumpFunError::AlreadyRaised
             );
+            let token_total_supply = (1000 - ctx.accounts.bonding_curve.reserved_ratio) * ctx.accounts.bonding_curve.max_supply / 10000;
             let current_supply =
-                MAX_SUPPLY - ctx.accounts.associted_bonding_curve.amount;
-            let sol = sol_amount - 4000000;  //fee to create tokenAccount
-            let token_amount_to_purchased = calculate_token_amount(current_supply, sol, decimals);
+                token_total_supply - ctx.accounts.associted_bonding_curve.amount;
+            let rent = Rent::get()?;
+            let token_account_size = 165; // SPL Token account size in bytes
+            let rent_exemption = rent.minimum_balance(token_account_size);
+
+            let sol = sol_amount - rent_exemption;  //fee to create tokenAccount
+            let token_amount_to_purchased = calculate_token_amount(current_supply, sol, decimals, ctx.accounts.bonding_curve.k, ctx.accounts.bonding_curve.initial_price);
             let available_qty =
-                ctx.accounts.associted_bonding_curve.amount - INIT_SUPPLY;
+                ctx.accounts.associted_bonding_curve.amount - init_supply;
 
             require!(token_amount_to_purchased <= available_qty, PumpFunError::NotEnoughSuppply);
+            if ctx.accounts.bonding_curve.maximum_per_user > 0 {
+                require!(
+                  ctx.accounts.user_conf.bought_amount + sol <= ctx.accounts.bonding_curve.maximum_per_user,
+                  PumpFunError::UserBuyLimitExceed
+                )
+            }
 
             //transfer sol to vault
             transfer_sol(
@@ -138,6 +166,7 @@ impl LzReceive<'_> {
                 decimals,
                 vault_signer_seeds,
             )?;
+            ctx.accounts.user_conf.bought_amount += sol;
             emit!(BuyEvent {
                 mint: ctx.accounts.token_mint.key(),
                 token_output: token_amount_to_purchased,

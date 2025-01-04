@@ -25,10 +25,12 @@ pub struct CreateGlobalConfig<'info> {
 impl CreateGlobalConfig<'_> {
   pub fn apply(ctx: &mut Context<CreateGlobalConfig>, params: &CreateGlobalConfigParams) -> Result<()> {
     let config = ctx.accounts.global_config.deref_mut();
-    config.admin = params.admin;
+    require!(!config.is_initialized, PumpFunError::AlreadyInitialized);
+    config.admin = ctx.accounts.payer.key();
     config.fee_recipient = params.fee_recipient;
     config.fee_rate = params.fee_rate; // 1: 0.001 %
     config.bump = ctx.bumps.global_config;
+    config.is_initialized = true;
     Ok(())
   }
 }

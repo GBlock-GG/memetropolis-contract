@@ -7,6 +7,13 @@ pub struct CreateTokenEvent {
   pub token_symbol: String,
   pub token_uri: String,
   pub mint: Pubkey,
+  pub k: f64,
+  pub initial_price: u64,
+  pub max_supply: u64,
+  pub sales_ratio: u64,
+  pub reserved_ratio: u64,
+  pub launch_date: u64,
+  pub maximum_per_user: u64,
 }
 
 #[event]

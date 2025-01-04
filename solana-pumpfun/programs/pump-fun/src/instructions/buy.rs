@@ -28,7 +28,7 @@ pub struct Buy<'info> {
     ],
     bump,
   )]
-  pub bonding_curve: UncheckedAccount<'info>,
+  pub bonding_curve: Box<Account<'info, BondingCurve>>,
 
   #[account(
     mut,
@@ -39,12 +39,26 @@ pub struct Buy<'info> {
   pub associted_bonding_curve: Box<InterfaceAccount<'info, TokenAccount>>,
 
   #[account(
-    mut,
+    init_if_needed,
     associated_token::mint = token_mint,
     associated_token::authority = user,
     token::token_program = token_program,
+    payer = user,
   )]
   pub associted_user_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
+
+  #[account(
+    init_if_needed,
+    seeds = [
+      USER_CONF_SEED,
+      token_mint.key().as_ref(),
+      user.key().as_ref(),
+    ],
+    payer = user,
+    bump,
+    space = 8 + UserConf::INIT_SPACE
+  )]
+  pub user_conf:Box<Account<'info, UserConf>>,
 
   #[account(mut)]
     pub user: Signer<'info>,
@@ -55,21 +69,39 @@ pub struct Buy<'info> {
 
 impl Buy<'_> {
   pub fn apply(ctx: &mut Context<Buy>, amount: u64, max_sol_cost: u64) -> Result<()> {
+    require!(
+      ctx.accounts.bonding_curve.launch_date <= Clock::get()?.unix_timestamp.try_into().unwrap(),
+      PumpFunError::TokenNotLaunched,
+    );
+
     let decimals = ctx.accounts.token_mint.decimals;
 
     // check to ensure funding goal is not met
+    let init_supply = ctx.accounts.bonding_curve.liquidity_pool_ratio * ctx.accounts.bonding_curve.max_supply / 10000;
     require!(
-        ctx.accounts.associted_bonding_curve.amount > INIT_SUPPLY,
+        ctx.accounts.associted_bonding_curve.amount > init_supply,
         PumpFunError::AlreadyRaised
     );
 
     let available_qty =
-        ctx.accounts.associted_bonding_curve.amount - INIT_SUPPLY;
+        ctx.accounts.associted_bonding_curve.amount - init_supply;
     require!(amount <= available_qty, PumpFunError::NotEnoughSuppply);
 
+    let token_total_supply = (1000 - ctx.accounts.bonding_curve.reserved_ratio) * ctx.accounts.bonding_curve.max_supply / 10000;
     let current_supply =
-        MAX_SUPPLY - ctx.accounts.associted_bonding_curve.amount;
-    let required_lamports = calculate_cost(current_supply, amount, decimals);
+      token_total_supply - ctx.accounts.associted_bonding_curve.amount;
+    let required_lamports = calculate_cost(
+      current_supply,
+      amount,
+      decimals,ctx.accounts.bonding_curve.k,
+      ctx.accounts.bonding_curve.initial_price
+    );
+    if ctx.accounts.bonding_curve.maximum_per_user > 0 {
+      require!(
+        ctx.accounts.user_conf.bought_amount + required_lamports <= ctx.accounts.bonding_curve.maximum_per_user,
+        PumpFunError::UserBuyLimitExceed
+      )
+    }
 
     require!(
         max_sol_cost >= required_lamports,
@@ -103,6 +135,8 @@ impl Buy<'_> {
         decimals,
         vault_signer_seeds,
     )?;
+    ctx.accounts.user_conf.bought_amount += required_lamports;
+
     emit!(BuyEvent {
         mint: ctx.accounts.token_mint.key(),
         token_output: amount,
