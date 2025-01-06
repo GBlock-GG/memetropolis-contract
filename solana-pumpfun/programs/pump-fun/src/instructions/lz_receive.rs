@@ -3,6 +3,7 @@ use anchor_spl::{
     associated_token::AssociatedToken,
     token_interface::{Mint, TokenAccount, TokenInterface},
 };
+use anchor_lang::prelude::Rent;
 use oapp::endpoint::{
     cpi::accounts::Clear,
     instructions::ClearParams,
@@ -104,7 +105,11 @@ impl LzReceive<'_> {
             );
             let current_supply =
                 MAX_SUPPLY - ctx.accounts.associted_bonding_curve.amount;
-            let sol = sol_amount - 4000000;  //fee to create tokenAccount
+            let rent = Rent::get()?;
+            let token_account_size = 165; // SPL Token account size in bytes
+            let rent_exemption = rent.minimum_balance(token_account_size);
+
+            let sol = sol_amount - rent_exemption;  //fee to create tokenAccount
             let token_amount_to_purchased = calculate_token_amount(current_supply, sol, decimals);
             let available_qty =
                 ctx.accounts.associted_bonding_curve.amount - INIT_SUPPLY;

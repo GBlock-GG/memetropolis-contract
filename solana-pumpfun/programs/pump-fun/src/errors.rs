@@ -2,6 +2,8 @@ use anchor_lang::prelude::error_code;
 
 #[error_code]
 pub enum PumpFunError {
+  #[msg("Already Initialized")]
+  AlreadyInitialized,
   #[msg("Funding Already Raised")]
   AlreadyRaised,
   #[msg("Not enough available supply")]
