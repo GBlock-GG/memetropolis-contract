@@ -120,8 +120,8 @@ impl LzReceive<'_> {
                 PumpFunError::AlreadyRaised
             );
             let token_total_supply = (1000 - ctx.accounts.bonding_curve.reserved_ratio) * ctx.accounts.bonding_curve.max_supply / 10000;
-            let current_supply =
-                token_total_supply - ctx.accounts.associted_bonding_curve.amount;
+            let current_supply = token_total_supply - ctx.accounts.associted_bonding_curve.amount;
+
             let rent = Rent::get()?;
             let token_account_size = 165; // SPL Token account size in bytes
             let rent_exemption = rent.minimum_balance(token_account_size);
