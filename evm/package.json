@@ -5,10 +5,14 @@
     "build": "forge build",
     "test": "forge test",
     "deploy": "make deploy-local",
+    "deploy:ethTestnet": "make deploy-ethTestnet",
     "deploy:bnbTestnet": "make deploy-bnbTestnet",
     "deploy:baseTestnet": "make deploy-baseTestnet",
     "deploy:arbitrumTestnet": "make deploy-arbitrumTestnet",
-    "deploy:ethTestnet": "make deploy-ethTestnet",
+    "deploy:ethMainnet": "make deploy-ethMainnet",
+    "deploy:bnbMainnet": "make deploy-bnbMainnet",
+    "deploy:baseMainnet": "make deploy-baseMainnet",
+    "deploy:arbitrumMainnet": "make deploy-arbitrumMainnet",
     "verify:bnbToken": "make verify-bnbToken"
   },
   "dependencies": {

@@ -142,7 +142,7 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
         return (fee.nativeFee, fee.lzTokenFee);
     }
 
-    /// @notice Allows users to buy meme tokens using ETH.
+    /// @notice Allows users to sell meme tokens.
     /// @param memeTokenAddress The address of the meme token contract.
     /// @param recipientAddress The recipient address.
     /// @param tokenQty The Token amount to sell.
@@ -158,7 +158,7 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
         );
     }
 
-    /// @notice Use this function to estimate fees for your cross-chain buyCrosschainMemetoken()
+    /// @notice Use this function to estimate fees for your cross-chain sellCrosschainMemetoken()
     function quoteSellCrossChainMemetoken(
         uint32 _dstEid,
         bytes32 memeTokenAddress,

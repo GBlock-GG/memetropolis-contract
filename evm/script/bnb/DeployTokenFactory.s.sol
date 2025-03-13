@@ -6,7 +6,8 @@ import "src/TokenFactory.sol";
 import "src/Token.sol";
 
 contract DeployTokenFactory is Script {
-    address constant LZ_ENDPOINT_V2_ADDRESS = 0x6EDCE65403992e310A62460808c4b910D972f10f; // 0x1a44076050125825900e736c501f859c50fE728c
+    // address constant LZ_ENDPOINT_V2_ADDRESS = 0x6EDCE65403992e310A62460808c4b910D972f10f; // testnet
+    address constant LZ_ENDPOINT_V2_ADDRESS = 0x1a44076050125825900e736c501f859c50fE728c; // mainnet
     address constant UNISWAP_V2_FACTORY_ADDRESS = 0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6;
     address constant UNISWAP_V2_ROUTER_ADDRESS = 0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24;
     
