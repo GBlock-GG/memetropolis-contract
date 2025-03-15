@@ -12,13 +12,11 @@ use state::*;
 use utils::*;
 use events::*;
 use errors::*;
-// use oapp::{
-//   endpoint::{MessagingFee, MessagingReceipt},
-  // LzReceiveParams,
-// };
+use oapp::{
+  endpoint::{MessagingFee, MessagingReceipt},
+};
 
-
-declare_id!("5Cn1DtzNYSVddUVFEC4NWvkbUemZDxHdMnM6SL4zreei");
+declare_id!("CiQZ4gYrjqkWE6QLWcRt5zYkjKrond7Ww1SD33qAtGQr");
 
 // pub const OFT_SEED: &[u8] = b"Oft";
 pub const OAPP_SEED: &[u8] = b"OApp";
@@ -82,13 +80,6 @@ pub mod pump_fun {
       SetPeer::apply(&mut ctx, &params)
   }
 
-  pub fn set_enforced_options(
-      mut ctx: Context<SetEnforcedOptions>,
-      params: SetEnforcedOptionsParams,
-  ) -> Result<()> {
-      SetEnforcedOptions::apply(&mut ctx, &params)
-  }
-
   // ============================== Public ==============================
   pub fn lz_receive(mut ctx: Context<LzReceive>, params: LzReceiveParams) -> Result<()> {
       LzReceive::apply(&mut ctx, &params)
@@ -99,6 +90,17 @@ pub mod pump_fun {
       params: LzReceiveParams,
   ) -> Result<Vec<oapp::endpoint_cpi::LzAccount>> {
       LzReceiveTypes::apply(&ctx, &params)
+  }
+
+  pub fn quote(ctx: Context<Quote>, params: QuoteParams) -> Result<MessagingFee> {
+    Quote::apply(&ctx, &params)
+  }
+
+  pub fn send(
+    mut ctx: Context<Send>,
+    params: SendParams,
+  ) -> Result<MessagingReceipt> {
+    Send::apply(&mut ctx, &params)
   }
 
 }

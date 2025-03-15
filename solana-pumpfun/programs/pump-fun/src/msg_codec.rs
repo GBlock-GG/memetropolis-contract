@@ -1,29 +1,45 @@
 
+use crate::*;
+
 const MEME_TOKEN_ADDRESS_OFFSET: usize = 1;
 const RECEIPT_ADDRESS_OFFSET: usize = 33;
 const SOL_AMOUNT_OFFSET: usize = 65;
 const TOKEN_AMOUNT_OFFSET: usize = 81;
 
-// pub fn encode(
-//     send_to: [u8; 32],
-//     amount_sd: u64,
-//     sender: Pubkey,
-//     compose_msg: &Option<Vec<u8>>,
-// ) -> Vec<u8> {
-//     if let Some(msg) = compose_msg {
-//         let mut encoded = Vec::with_capacity(72 + msg.len()); // 32 + 8 + 32
-//         encoded.extend_from_slice(&send_to);
-//         encoded.extend_from_slice(&amount_sd.to_be_bytes());
-//         encoded.extend_from_slice(sender.to_bytes().as_ref());
-//         encoded.extend_from_slice(&msg);
-//         encoded
-//     } else {
-//         let mut encoded = Vec::with_capacity(40); // 32 + 8
-//         encoded.extend_from_slice(&send_to);
-//         encoded.extend_from_slice(&amount_sd.to_be_bytes());
-//         encoded
-//     }
-// }
+// make msg to cross chain
+pub fn encode(
+  msg_type: u8, // buy: 1, sell: 2
+  meme_token_addr: [u8; 32],
+  to_addr: [u8; 32],
+  eth_amount: u128, //16 byte
+  token_amount: u128, // 16 byte,  evm contract has 32 bytes, so increase 16bytes more
+  sender: Pubkey,
+  compose_msg: &Option<Vec<u8>>,
+) -> Vec<u8> {
+  if let Some(msg) = compose_msg {
+      let mut encoded = Vec::with_capacity(145 + msg.len()); // 1 + 32 + 32 + 16 + 32 + 32
+      encoded.extend_from_slice(&(vec![msg_type]));
+      encoded.extend_from_slice(&meme_token_addr);
+      encoded.extend_from_slice(&to_addr);
+      encoded.extend_from_slice(&eth_amount.to_be_bytes());
+      //32 bytes for token_amount
+      encoded.extend_from_slice(&vec![0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]);
+      encoded.extend_from_slice(&token_amount.to_be_bytes());
+      encoded.extend_from_slice(sender.to_bytes().as_ref());
+      encoded.extend_from_slice(&msg);
+      encoded
+  } else {
+      let mut encoded = Vec::with_capacity(113); // 1 + 32 + 32 + 16 + 32
+      encoded.extend_from_slice(&(vec![msg_type]));
+      encoded.extend_from_slice(&meme_token_addr);
+      encoded.extend_from_slice(&to_addr);
+      encoded.extend_from_slice(&eth_amount.to_be_bytes());
+      //32 bytes for token_amount
+      encoded.extend_from_slice(&vec![0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]);
+      encoded.extend_from_slice(&token_amount.to_be_bytes());
+      encoded
+  }
+}
 
 pub fn is_buy_token(message:&[u8]) -> bool {
     message[0] == 1
