@@ -1,13 +1,11 @@
 [toolchain]
-anchor_version = "0.29.0"
-solana_version = "1.18.18"
 
 [features]
 seeds = false
 skip-lint = false
 
 [programs.localnet]
-pump_fun = "5Cn1DtzNYSVddUVFEC4NWvkbUemZDxHdMnM6SL4zreei"
+pump_fun = "CiQZ4gYrjqkWE6QLWcRt5zYkjKrond7Ww1SD33qAtGQr"
 
 [registry]
 url = "https://api.apr.dev"
