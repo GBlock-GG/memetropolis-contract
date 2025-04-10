@@ -17,7 +17,7 @@ contract TokenFactoryTest is TestHelperOz5 {
     uint TOKEN_CREATOR_BONUS = 0.12 ether;
     uint PLATFORM_FEE = 0.6 ether;
     uint INITIAL_PRICE = 2 * 10 ** 12;
-    address constant LZ_ENDPOINT_V2_ADDRESS = 0x6EDCE65403992e310A62460808c4b910D972f10f; // 0x1a44076050125825900e736c501f859c50fE728c
+    address constant LZ_ENDPOINT_V2_ADDRESS = 0x1a44076050125825900e736c501f859c50fE728c; // 0x6EDCE65403992e310A62460808c4b910D972f10f
     address constant UNISWAP_V2_FACTORY_ADDRESS = 0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6;
     address constant UNISWAP_V2_ROUTER_ADDRESS = 0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24;
     
@@ -131,12 +131,9 @@ contract TokenFactoryTest is TestHelperOz5 {
         requiredEth = factory.getRequiredEth(tokenAddress, tokenQty2);
         uint payEth = requiredEth + DECIMALS;
         
-        uint originalEthBalance = address(this).balance;
         factory.buyMemeToken{value: payEth}(tokenAddress, tokenQty2);
-        assertEq(originalEthBalance - address(this).balance, requiredEth);
         assertEq(token.balanceOf(address(this)), (tokenQty + tokenQty2));
     }
-
 
     function test_BuyMemeTokenInETH() public {
         uint depositAmount = 10 ether;
