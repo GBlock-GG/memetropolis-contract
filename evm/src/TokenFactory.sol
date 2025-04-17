@@ -9,6 +9,7 @@ import "./interface/IUniswapV2Router02.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 import {
     Origin,
     MessagingFee
@@ -19,7 +20,7 @@ import { OptionsBuilder } from "@layerzerolabs/lz-evm-oapp-v2/contracts/oapp/lib
 /// @title Meme Token Factory
 /// @notice This contract allows users to create and manage Meme tokens, which can be traded and sold on Uniswap.
 /// @dev It includes features such as funding, token creation, Uniswap liquidity pool creation, and trading based on an exponential bonding curve.
-contract TokenFactory is ReentrancyGuard, Ownable, OApp {
+contract TokenFactory is ReentrancyGuard, Ownable, Pausable, OApp {
     using OptionsBuilder for bytes;
 
     /// @notice Data structure to hold custom token informations.
@@ -103,7 +104,7 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
         Ownable(msg.sender)
         OApp(_lzEndpoint, msg.sender)
     {
-        if (treasuryAddress == address(0) || _lzEndpoint == address(0))
+        if (treasuryAddress == address(0) || _lzEndpoint == address(0) || _uniswapV2Factory == address(0) || _uniswapV2Router == address(0))
             revert IncorrectAddress();
 
         PLATFORM_TREASURY_ADDRESS = treasuryAddress;
@@ -112,6 +113,18 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
         DEFAULT_INITIAL_PRICE = initialPrice;
         UNISWAP_V2_FACTORY_ADDRESS = _uniswapV2Factory;
         UNISWAP_V2_ROUTER_ADDRESS = _uniswapV2Router;
+    }
+
+    /// @notice Pauses the contract.
+    /// @dev Only callable by the contract owner.
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    /// @notice Unpauses the contract.
+    /// @dev Only callable by the contract owner.
+    function unpause() external onlyOwner {
+        _unpause();
     }
 
     /// @notice Sets the token creator bonus.
@@ -146,7 +159,7 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
     /// @param memeTokenAddress The address of the meme token contract.
     /// @param recipientAddress The recipient address.
     /// @param ethAmount The Eth amount.
-    function buyCrosschainMemetoken(uint32 _dstEid, bytes32 memeTokenAddress, bytes32 recipientAddress, uint128 ethAmount) external payable {
+    function buyCrosschainMemetoken(uint32 _dstEid, bytes32 memeTokenAddress, bytes32 recipientAddress, uint128 ethAmount) external payable whenNotPaused {
         bytes memory message = abi.encodePacked(BUY_TYPE, memeTokenAddress, recipientAddress, ethAmount, uint256(0));
         bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(200000, ethAmount);
         _lzSend(
@@ -175,7 +188,7 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
     /// @param memeTokenAddress The address of the meme token contract.
     /// @param recipientAddress The recipient address.
     /// @param tokenQty The Token amount to sell.
-    function sellCrosschainMemetoken(uint32 _dstEid, bytes32 memeTokenAddress, bytes32 recipientAddress, uint256 tokenQty) external payable {
+    function sellCrosschainMemetoken(uint32 _dstEid, bytes32 memeTokenAddress, bytes32 recipientAddress, uint256 tokenQty) external payable whenNotPaused {
         bytes memory message = abi.encodePacked(SELL_TYPE, memeTokenAddress, recipientAddress, uint128(0), tokenQty);
         bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(200000, 0);
         _lzSend(
@@ -309,8 +322,8 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
         uint liquidityPoolRatio,
         uint launchDate,
         uint maximumPerUser
-    ) external returns(address) {
-        if (bytes(name).length == 0 || bytes(symbol).length == 0)
+    ) external whenNotPaused returns(address) {
+        if (bytes(name).length == 0 || bytes(symbol).length == 0 || bytes(imageUrl).length == 0)
             revert InvalidTokenCreation();
 
         //should deploy the meme token, mint the initial supply to the token factory contract
@@ -410,7 +423,7 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
     /// @notice Allows users to buy meme tokens using ETH.
     /// @param memeTokenAddress The address of the meme token contract.
     /// @param tokenQty The token amount to buy.
-    function buyMemeToken(address memeTokenAddress, uint tokenQty) external payable {
+    function buyMemeToken(address memeTokenAddress, uint tokenQty) external payable whenNotPaused {
         MemeToken storage listedToken = addressToMemeTokenMapping[memeTokenAddress];
         //check if memecoin is listed
         if (listedToken.tokenAddress == address(0))
@@ -478,7 +491,7 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
     /// @notice Allows users to buy meme tokens using ETH.
     /// @param memeTokenAddress The address of the meme token contract.
     /// @param tokenQtyMin The minimum token amount to buy.
-    function buyMemeTokenInEth(address memeTokenAddress, uint tokenQtyMin) external payable {
+    function buyMemeTokenInEth(address memeTokenAddress, uint tokenQtyMin) external payable whenNotPaused {
         uint256 tokenAmount = _buyMemeTokenInEth(memeTokenAddress, msg.value, msg.sender, tokenQtyMin);
 
         emit BoughtMemeToken(memeTokenAddress, msg.sender, tokenAmount, msg.value);
@@ -547,7 +560,7 @@ contract TokenFactory is ReentrancyGuard, Ownable, OApp {
     /// @param memeTokenAddress The address of the meme token contract.
     /// @param tokenQty The number of tokens to sell.
     /// @return The amount of ETH received in return.
-    function sellMemeToken(address memeTokenAddress, uint tokenQty) external nonReentrant returns(uint) {
+    function sellMemeToken(address memeTokenAddress, uint tokenQty) external nonReentrant whenNotPaused returns(uint) {
         uint256 ethAmount = _sellMemeToken(memeTokenAddress, msg.sender, tokenQty);
 
         emit SoldMemeToken(memeTokenAddress, msg.sender, tokenQty, ethAmount);
